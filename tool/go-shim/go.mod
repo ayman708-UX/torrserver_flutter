@@ -1,8 +1,13 @@
 module github.com/ayman708-UX/torrserver_flutter/tool/go-shim
 
-go 1.26.0
+go 1.25.7
 
-require server v0.0.0-00010101000000-000000000000
+tool golang.org/x/mobile/cmd/gobind
+
+require (
+	golang.org/x/mobile v0.0.0-20260821190718-4776eadac327
+	server v0.0.0-00010101000000-000000000000
+)
 
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect

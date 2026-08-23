@@ -52,7 +52,7 @@ jobs:
       - name: Build TorrServerKit.xcframework
         run: |
           cd tool/go-shim
-          go get -d golang.org/x/mobile/cmd/gobind@latest
+          go get -tool golang.org/x/mobile/cmd/gobind
           go mod tidy
 
           gomobile bind \
