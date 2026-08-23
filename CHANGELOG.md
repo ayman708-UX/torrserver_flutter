@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.4
+
+- Automatic process lifecycle management on app close/exit via Win32 Job Object (`KILL_ON_JOB_CLOSE`), `AppLifecycleListener`, and OS process signal handlers.
+- Startup orphan process detection and cleanup.
+- Strict static analysis formatting fixes (curly braces in all flow control structures) for maximum pub.dev scoring.
+
 ## 0.0.3
 
 - Reduce release asset download sizes by ~75% (from ~58 MB to ~15 MB) via `.zip` and `.tar.gz` archive packaging.

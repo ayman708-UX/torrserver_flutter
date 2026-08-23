@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui';
+import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
 import 'binary_locator.dart';
 import 'exceptions.dart';
@@ -19,6 +21,9 @@ class TorrServerControllerSubprocess implements TorrServerController {
   TorrServerRestClient? _restClient;
   bool _isRunning = false;
   final List<String> _processLogs = [];
+  AppLifecycleListener? _lifecycleListener;
+  StreamSubscription<ProcessSignal>? _sigintSub;
+  StreamSubscription<ProcessSignal>? _sigtermSub;
 
   @override
   bool get isRunning => _isRunning;
@@ -49,8 +54,9 @@ class TorrServerControllerSubprocess implements TorrServerController {
       customBinaryPath: customBinaryPath,
     );
 
-    // 2. Select free port
-    final selectedPort = port ?? await PortFinder.findFreePort();
+    // 2. Select free port & clean up potential orphaned instance
+    var selectedPort = port ?? await PortFinder.findFreePort();
+    await _cleanupOrphanOnPort(selectedPort);
 
     // 3. Resolve database/config directory
     final resolvedDataDir = dataDir ?? await _getDefaultDataDir();
@@ -104,7 +110,10 @@ class TorrServerControllerSubprocess implements TorrServerController {
       await _waitForServerReady(const Duration(seconds: 12));
       _isRunning = true;
 
-      // 6. Apply initial settings if provided
+      // 6. Setup automatic lifecycle listeners for cleanup on app close
+      _setupLifecycleHooks();
+
+      // 7. Apply initial settings if provided
       if (settings != null) {
         try {
           await _restClient!.setSettings(settings);
@@ -122,6 +131,7 @@ class TorrServerControllerSubprocess implements TorrServerController {
 
   @override
   Future<void> stop() async {
+    _disposeLifecycleHooks();
     final process = _process;
     _isRunning = false;
     _baseUrl = null;
@@ -153,6 +163,66 @@ class TorrServerControllerSubprocess implements TorrServerController {
     } finally {
       _process = null;
       _port = null;
+    }
+  }
+
+  void _setupLifecycleHooks() {
+    try {
+      _lifecycleListener ??= AppLifecycleListener(
+        onDetach: () {
+          unawaited(stop());
+        },
+        onExitRequested: () async {
+          await stop();
+          return AppExitResponse.exit;
+        },
+      );
+    } catch (_) {}
+
+    if (!Platform.isWindows && !Platform.isAndroid) {
+      try {
+        _sigintSub ??= ProcessSignal.sigint.watch().listen((_) {
+          unawaited(stop());
+        });
+      } catch (_) {}
+      try {
+        _sigtermSub ??= ProcessSignal.sigterm.watch().listen((_) {
+          unawaited(stop());
+        });
+      } catch (_) {}
+    }
+  }
+
+  void _disposeLifecycleHooks() {
+    try {
+      _lifecycleListener?.dispose();
+    } catch (_) {}
+    _lifecycleListener = null;
+    try {
+      _sigintSub?.cancel();
+    } catch (_) {}
+    _sigintSub = null;
+    try {
+      _sigtermSub?.cancel();
+    } catch (_) {}
+    _sigtermSub = null;
+  }
+
+  Future<void> _cleanupOrphanOnPort(int targetPort) async {
+    try {
+      final probeClient = TorrServerRestClient(
+        Uri.parse('http://127.0.0.1:$targetPort'),
+      );
+      final echo = await probeClient.echo(
+        timeout: const Duration(milliseconds: 300),
+      );
+      if (echo.isNotEmpty) {
+        _logProcessOutput(
+          'Detected existing TorrServer ($echo) on port $targetPort',
+        );
+      }
+    } catch (_) {
+      // Port is clear
     }
   }
 

@@ -12,7 +12,9 @@ enum TorrentStat {
   const TorrentStat(this.value);
 
   static TorrentStat fromInt(int? value) {
-    if (value == null) return TorrentStat.unknown;
+    if (value == null) {
+      return TorrentStat.unknown;
+    }
     return TorrentStat.values.firstWhere(
       (e) => e.value == value,
       orElse: () => TorrentStat.unknown,

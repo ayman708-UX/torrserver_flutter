@@ -33,7 +33,9 @@ class TorrServerRestClient {
         res.body,
       );
     } catch (e) {
-      if (e is TorrServerHttpException) rethrow;
+      if (e is TorrServerHttpException) {
+        rethrow;
+      }
       throw TorrServerHttpException(
           'Failed to connect to TorrServer at $baseUrl', 0, e.toString());
     }
@@ -90,13 +92,21 @@ class TorrServerRestClient {
         ),
       );
 
-      if (title != null && title.isNotEmpty) request.fields['title'] = title;
-      if (category != null && category.isNotEmpty)
+      if (title != null && title.isNotEmpty) {
+        request.fields['title'] = title;
+      }
+      if (category != null && category.isNotEmpty) {
         request.fields['category'] = category;
-      if (poster != null && poster.isNotEmpty)
+      }
+      if (poster != null && poster.isNotEmpty) {
         request.fields['poster'] = poster;
-      if (data != null && data.isNotEmpty) request.fields['data'] = data;
-      if (saveToDb) request.fields['save'] = 'true';
+      }
+      if (data != null && data.isNotEmpty) {
+        request.fields['data'] = data;
+      }
+      if (saveToDb) {
+        request.fields['save'] = 'true';
+      }
 
       final streamedResponse = await _client.send(request);
       final response = await http.Response.fromStream(streamedResponse);
@@ -123,7 +133,9 @@ class TorrServerRestClient {
         response.body,
       );
     } catch (e) {
-      if (e is TorrServerHttpException) rethrow;
+      if (e is TorrServerHttpException) {
+        rethrow;
+      }
       throw TorrServerHttpException(
           'Failed to upload torrent file', 0, e.toString());
     }
@@ -236,7 +248,9 @@ class TorrServerRestClient {
       );
 
       if (res.statusCode >= 200 && res.statusCode < 300) {
-        if (res.body.isEmpty) return null;
+        if (res.body.isEmpty) {
+          return null;
+        }
         return jsonDecode(res.body);
       }
 
@@ -246,7 +260,9 @@ class TorrServerRestClient {
         res.body,
       );
     } catch (e) {
-      if (e is TorrServerHttpException) rethrow;
+      if (e is TorrServerHttpException) {
+        rethrow;
+      }
       throw TorrServerHttpException(
           'Failed communicating with TorrServer at $endpoint', 0, e.toString());
     }
