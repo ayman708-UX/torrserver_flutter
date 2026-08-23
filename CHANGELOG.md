@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.3
+
+- Reduce release asset download sizes by ~75% (from ~58 MB to ~15 MB) via `.zip` and `.tar.gz` archive packaging.
+- Fix Android runtime binary discovery by querying `nativeLibraryDir` via MethodChannel and setting `android:extractNativeLibs="true"`.
+- Add 16 KB ELF page-size alignment (`-extldflags=-Wl,-z,max-page-size=16384`) for Android 15+ compliance.
+- Explicit `chmod 755` executable permissions across all platform archive extractors.
+
 ## 0.0.2
 
 - Fix Android JVM target compatibility between Java and Kotlin compilation tasks (`JavaVersion.VERSION_1_8` and `jvmTarget = '1.8'`).

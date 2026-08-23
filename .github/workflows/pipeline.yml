@@ -62,30 +62,35 @@ jobs:
             goos: windows
             goarch: amd64
             bin_name: torrserver-windows-amd64.exe
+            archive_name: torrserver-windows-amd64.zip
             smoke_test: true
           - name: Linux amd64
             os: ubuntu-latest
             goos: linux
             goarch: amd64
             bin_name: torrserver-linux-amd64
+            archive_name: torrserver-linux-amd64.tar.gz
             smoke_test: true
           - name: Linux arm64
             os: ubuntu-latest
             goos: linux
             goarch: arm64
             bin_name: torrserver-linux-arm64
+            archive_name: torrserver-linux-arm64.tar.gz
             smoke_test: false
           - name: macOS amd64
             os: macos-15
             goos: darwin
             goarch: amd64
             bin_name: torrserver-darwin-amd64
+            archive_name: torrserver-darwin-amd64.tar.gz
             smoke_test: false
           - name: macOS arm64
             os: macos-15
             goos: darwin
             goarch: arm64
             bin_name: torrserver-darwin-arm64
+            archive_name: torrserver-darwin-arm64.tar.gz
             smoke_test: true
 
     env:
@@ -165,11 +170,25 @@ jobs:
             exit 1
           fi
 
-      - name: Upload Binary Artifact
+      - name: Package Desktop Binary Archive
+        shell: bash
+        run: |
+          cd "${{ github.workspace }}/dist"
+          if [[ "${{ matrix.archive_name }}" == *.zip ]]; then
+            if command -v zip &>/dev/null; then
+              zip -9 "${{ matrix.archive_name }}" "${{ matrix.bin_name }}"
+            else
+              powershell -Command "Compress-Archive -Path '${{ matrix.bin_name }}' -DestinationPath '${{ matrix.archive_name }}' -Force"
+            fi
+          else
+            tar -czvf "${{ matrix.archive_name }}" "${{ matrix.bin_name }}"
+          fi
+
+      - name: Upload Binary Archive Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.bin_name }}
-          path: dist/${{ matrix.bin_name }}
+          name: ${{ matrix.archive_name }}
+          path: dist/${{ matrix.archive_name }}
           if-no-files-found: error
 
   # ============================================================================
@@ -187,21 +206,25 @@ jobs:
             goarm: ""
             compiler: aarch64-linux-android21-clang
             bin_name: torrserver-android-arm64
+            archive_name: torrserver-android-arm64.zip
           - arch: amd64
             goarch: amd64
             goarm: ""
             compiler: x86_64-linux-android21-clang
             bin_name: torrserver-android-amd64
+            archive_name: torrserver-android-amd64.zip
           - arch: arm7
             goarch: arm
             goarm: "7"
             compiler: armv7a-linux-androideabi21-clang
             bin_name: torrserver-android-arm7
+            archive_name: torrserver-android-arm7.zip
           - arch: 386
             goarch: 386
             goarm: ""
             compiler: i686-linux-android21-clang
             bin_name: torrserver-android-386
+            archive_name: torrserver-android-386.zip
 
     env:
       NDK_VERSION: "25.2.9519653"
@@ -237,7 +260,7 @@ jobs:
           cd upstream_ts
           go run gen_web.go
 
-      - name: Cross-compile for Android (${{ matrix.arch }})
+      - name: Cross-compile for Android (${{ matrix.arch }}) with 16KB Page Alignment
         run: |
           mkdir -p dist
           export NDK_TOOLCHAIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64"
@@ -251,13 +274,18 @@ jobs:
           fi
 
           cd upstream_ts/server
-          go build -ldflags='-s -w -checklinkname=0' -tags=nosqlite -trimpath -o "${{ github.workspace }}/dist/${{ matrix.bin_name }}" ./cmd
+          go build -ldflags='-s -w -checklinkname=0 -extldflags=-Wl,-z,max-page-size=16384' -tags=nosqlite -trimpath -o "${{ github.workspace }}/dist/${{ matrix.bin_name }}" ./cmd
 
-      - name: Upload Android Binary Artifact
+      - name: Package Android Binary Archive (.zip)
+        run: |
+          cd "${{ github.workspace }}/dist"
+          zip -9 "${{ matrix.archive_name }}" "${{ matrix.bin_name }}"
+
+      - name: Upload Android Binary Archive Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.bin_name }}
-          path: dist/${{ matrix.bin_name }}
+          name: ${{ matrix.archive_name }}
+          path: dist/${{ matrix.archive_name }}
           if-no-files-found: error
 
   # ============================================================================

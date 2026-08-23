@@ -7,7 +7,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <application>
+    <application android:extractNativeLibs="true">
         <service
             android:name=".TorrServerForegroundService"
             android:enabled="true"

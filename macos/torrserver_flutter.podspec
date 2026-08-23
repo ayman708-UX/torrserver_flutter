@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'torrserver_flutter'
-  s.version          = '0.0.2'
+  s.version          = '0.0.3'
   s.summary          = 'TorrServer Flutter macOS plugin'
   s.description      = <<-DESC
 Flutter package wrapping TorrServer for macOS desktop via subprocess model.
@@ -20,25 +20,42 @@ Flutter package wrapping TorrServer for macOS desktop via subprocess model.
   # Download macOS TorrServer binary hook
   s.prepare_command = <<-CMD
     set -e
-    VERSION="0.0.2"
+    VERSION="0.0.3"
     LOCAL_BIN="${TORRSERVER_FLUTTER_LOCAL_BINARIES}"
     mkdir -p bin
 
     ARCH=$(uname -m)
     if [ "$ARCH" = "x86_64" ]; then
-      BIN_NAME="torrserver-darwin-amd64"
+      ARCH_NAME="amd64"
     else
-      BIN_NAME="torrserver-darwin-arm64"
+      ARCH_NAME="arm64"
     fi
 
-    if [ -n "$LOCAL_BIN" ] && [ -f "$LOCAL_BIN/$BIN_NAME" ]; then
+    ARCHIVE_NAME="torrserver-darwin-${ARCH_NAME}.tar.gz"
+    BIN_NAME="torrserver-darwin-${ARCH_NAME}"
+
+    if [ -n "$LOCAL_BIN" ] && [ -f "$LOCAL_BIN/$ARCHIVE_NAME" ]; then
+      echo "Extracting local macOS archive from $LOCAL_BIN/$ARCHIVE_NAME"
+      tar -xzf "$LOCAL_BIN/$ARCHIVE_NAME" -C bin/
+      if [ -f "bin/$BIN_NAME" ]; then
+        mv "bin/$BIN_NAME" bin/torrserver
+      fi
+      chmod 755 bin/torrserver
+    elif [ -n "$LOCAL_BIN" ] && [ -f "$LOCAL_BIN/$BIN_NAME" ]; then
       echo "Using local macOS binary from $LOCAL_BIN"
       cp "$LOCAL_BIN/$BIN_NAME" bin/torrserver
-      chmod +x bin/torrserver
+      chmod 755 bin/torrserver
     elif [ ! -f "bin/torrserver" ]; then
-      echo "Downloading TorrServer macOS binary ($BIN_NAME) from GitHub Releases..."
-      curl -sL "https://github.com/ayman708-UX/torrserver_flutter/releases/download/v${VERSION}/${BIN_NAME}" -o bin/torrserver || true
-      chmod +x bin/torrserver || true
+      echo "Downloading TorrServer macOS compressed archive ($ARCHIVE_NAME) from GitHub Releases..."
+      curl -sL "https://github.com/ayman708-UX/torrserver_flutter/releases/download/v${VERSION}/${ARCHIVE_NAME}" -o "bin/${ARCHIVE_NAME}" || true
+      if [ -f "bin/${ARCHIVE_NAME}" ]; then
+        tar -xzf "bin/${ARCHIVE_NAME}" -C bin/ || true
+        if [ -f "bin/$BIN_NAME" ]; then
+          mv "bin/$BIN_NAME" bin/torrserver || true
+        fi
+        rm -f "bin/${ARCHIVE_NAME}"
+        chmod 755 bin/torrserver || true
+      fi
     fi
   CMD
 end

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'exceptions.dart';
@@ -36,6 +37,18 @@ class BinaryLocator {
 
     // Check executable directory and application support paths
     final searchDirs = <Directory>[];
+
+    // On Android, query nativeLibraryDir directly from the plugin MethodChannel
+    if (Platform.isAndroid) {
+      try {
+        const channel = MethodChannel('torrserver_flutter');
+        final nativeDir =
+            await channel.invokeMethod<String>('getNativeLibraryDir');
+        if (nativeDir != null && nativeDir.isNotEmpty) {
+          searchDirs.add(Directory(nativeDir));
+        }
+      } catch (_) {}
+    }
 
     try {
       final exeDir = File(Platform.resolvedExecutable).parent;

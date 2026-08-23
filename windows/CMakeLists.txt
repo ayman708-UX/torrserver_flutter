@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.18)
 set(PROJECT_NAME "torrserver_flutter")
 project(${PROJECT_NAME} LANGUAGES CXX)
 
@@ -25,7 +25,8 @@ target_include_directories(${PLUGIN_NAME} INTERFACE
 target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)
 
 # --- TorrServer Native Binary Setup ---
-set(TORRSERVER_VERSION "0.0.2")
+set(TORRSERVER_VERSION "0.0.3")
+set(TORRSERVER_ZIP_NAME "torrserver-windows-amd64.zip")
 set(TORRSERVER_BIN_NAME "torrserver-windows-amd64.exe")
 set(TORRSERVER_DEST_NAME "torrserver.exe")
 set(LOCAL_BIN_DIR "$ENV{TORRSERVER_FLUTTER_LOCAL_BINARIES}")
@@ -34,7 +35,13 @@ set(TORRSERVER_CACHED_BIN "${TORRSERVER_CACHE_DIR}/${TORRSERVER_DEST_NAME}")
 
 file(MAKE_DIRECTORY "${TORRSERVER_CACHE_DIR}")
 
-if(EXISTS "${LOCAL_BIN_DIR}/${TORRSERVER_BIN_NAME}")
+if(EXISTS "${LOCAL_BIN_DIR}/${TORRSERVER_ZIP_NAME}")
+  message(STATUS "Using local TorrServer archive: ${LOCAL_BIN_DIR}/${TORRSERVER_ZIP_NAME}")
+  file(ARCHIVE_EXTRACT INPUT "${LOCAL_BIN_DIR}/${TORRSERVER_ZIP_NAME}" DESTINATION "${TORRSERVER_CACHE_DIR}")
+  if(EXISTS "${TORRSERVER_CACHE_DIR}/${TORRSERVER_BIN_NAME}")
+    file(RENAME "${TORRSERVER_CACHE_DIR}/${TORRSERVER_BIN_NAME}" "${TORRSERVER_CACHED_BIN}")
+  endif()
+elseif(EXISTS "${LOCAL_BIN_DIR}/${TORRSERVER_BIN_NAME}")
   message(STATUS "Using local TorrServer binary: ${LOCAL_BIN_DIR}/${TORRSERVER_BIN_NAME}")
   file(COPY "${LOCAL_BIN_DIR}/${TORRSERVER_BIN_NAME}" DESTINATION "${TORRSERVER_CACHE_DIR}")
   file(RENAME "${TORRSERVER_CACHE_DIR}/${TORRSERVER_BIN_NAME}" "${TORRSERVER_CACHED_BIN}")
@@ -42,14 +49,20 @@ elseif(EXISTS "${LOCAL_BIN_DIR}/${TORRSERVER_DEST_NAME}")
   message(STATUS "Using local TorrServer binary: ${LOCAL_BIN_DIR}/${TORRSERVER_DEST_NAME}")
   file(COPY "${LOCAL_BIN_DIR}/${TORRSERVER_DEST_NAME}" DESTINATION "${TORRSERVER_CACHE_DIR}")
 elseif(NOT EXISTS "${TORRSERVER_CACHED_BIN}")
-  message(STATUS "Downloading TorrServer binary from GitHub Releases (v${TORRSERVER_VERSION})...")
-  set(DOWNLOAD_URL "https://github.com/ayman708-UX/torrserver_flutter/releases/download/v${TORRSERVER_VERSION}/${TORRSERVER_BIN_NAME}")
-  file(DOWNLOAD "${DOWNLOAD_URL}" "${TORRSERVER_CACHED_BIN}"
+  message(STATUS "Downloading compressed TorrServer binary from GitHub Releases (v${TORRSERVER_VERSION})...")
+  set(DOWNLOAD_URL "https://github.com/ayman708-UX/torrserver_flutter/releases/download/v${TORRSERVER_VERSION}/${TORRSERVER_ZIP_NAME}")
+  file(DOWNLOAD "${DOWNLOAD_URL}" "${TORRSERVER_CACHE_DIR}/${TORRSERVER_ZIP_NAME}"
     STATUS DOWNLOAD_STATUS
     LOG DOWNLOAD_LOG
   )
   list(GET DOWNLOAD_STATUS 0 STATUS_CODE)
-  if(NOT STATUS_CODE EQUAL 0)
+  if(STATUS_CODE EQUAL 0)
+    file(ARCHIVE_EXTRACT INPUT "${TORRSERVER_CACHE_DIR}/${TORRSERVER_ZIP_NAME}" DESTINATION "${TORRSERVER_CACHE_DIR}")
+    if(EXISTS "${TORRSERVER_CACHE_DIR}/${TORRSERVER_BIN_NAME}")
+      file(RENAME "${TORRSERVER_CACHE_DIR}/${TORRSERVER_BIN_NAME}" "${TORRSERVER_CACHED_BIN}")
+    endif()
+    file(REMOVE "${TORRSERVER_CACHE_DIR}/${TORRSERVER_ZIP_NAME}")
+  else()
     message(WARNING "TorrServer binary download skipped/deferred: ${DOWNLOAD_LOG}")
   endif()
 endif()
