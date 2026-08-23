@@ -52,6 +52,11 @@ jobs:
       - name: Build TorrServerKit.xcframework
         run: |
           cd tool/go-shim
+          go get golang.org/x/mobile/cmd/gobind@latest || true
+          go get golang.org/x/mobile/bind@latest || true
+          go get golang.org/x/mobile@latest || true
+          go mod tidy
+
           gomobile bind \
             -target=ios/arm64,iossimulator/arm64 \
             -iosversion=13.0 \

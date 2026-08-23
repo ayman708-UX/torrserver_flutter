@@ -1,4 +1,4 @@
-package main
+package torrserverkit
 
 /*
 #include <stdlib.h>
@@ -108,5 +108,3 @@ func StopServer() *C.char {
 func IsRunning() C.int {
 	return C.int(atomic.LoadInt32(&running))
 }
-
-func main() {}
