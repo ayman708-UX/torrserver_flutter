@@ -72,7 +72,7 @@ task downloadTorrServerBinaries {
             } else if (!targetFile.exists()) {
                 println "Downloading TorrServer binary for ${abi} (v${version})..."
                 try {
-                    def url = "https://github.com/torrserver-flutter/torrserver_flutter/releases/download/v${version}/${binName}"
+                    def url = "https://github.com/ayman708-UX/torrserver_flutter/releases/download/v${version}/${binName}"
                     new URL(url).withInputStream { i -> targetFile.withOutputStream { it << i } }
                 } catch (Exception e) {
                     println "Warning: Failed to download TorrServer binary for ${abi}: ${e.message}"

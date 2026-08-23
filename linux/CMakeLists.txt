@@ -48,7 +48,7 @@ elseif(EXISTS "${LOCAL_BIN_DIR}/${TORRSERVER_DEST_NAME}")
   file(COPY "${LOCAL_BIN_DIR}/${TORRSERVER_DEST_NAME}" DESTINATION "${TORRSERVER_CACHE_DIR}")
 elseif(NOT EXISTS "${TORRSERVER_CACHED_BIN}")
   message(STATUS "Downloading TorrServer binary from GitHub Releases (v${TORRSERVER_VERSION})...")
-  set(DOWNLOAD_URL "https://github.com/torrserver-flutter/torrserver_flutter/releases/download/v${TORRSERVER_VERSION}/${TORRSERVER_BIN_NAME}")
+  set(DOWNLOAD_URL "https://github.com/ayman708-UX/torrserver_flutter/releases/download/v${TORRSERVER_VERSION}/${TORRSERVER_BIN_NAME}")
   file(DOWNLOAD "${DOWNLOAD_URL}" "${TORRSERVER_CACHED_BIN}"
     STATUS DOWNLOAD_STATUS
     LOG DOWNLOAD_LOG

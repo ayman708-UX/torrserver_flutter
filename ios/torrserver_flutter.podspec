@@ -5,7 +5,7 @@ Pod::Spec.new do |s|
   s.description      = <<-DESC
 A Flutter package embedding TorrServer as an in-process XCFramework for iOS.
                        DESC
-  s.homepage         = 'https://github.com/torrserver-flutter/torrserver_flutter'
+  s.homepage         = 'https://github.com/ayman708-UX/torrserver_flutter'
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'TorrServer Flutter Contributors' => 'contributors@torrserver.local' }
 
@@ -40,7 +40,7 @@ A Flutter package embedding TorrServer as an in-process XCFramework for iOS.
       unzip -q "$LOCAL_BIN/TorrServerKit.xcframework.zip" -d .
     elif [ ! -d "TorrServerKit.xcframework" ]; then
       echo "Downloading TorrServerKit.xcframework from GitHub Releases..."
-      curl -sL "https://github.com/torrserver-flutter/torrserver_flutter/releases/download/v${VERSION}/TorrServerKit.xcframework.zip" -o TorrServerKit.xcframework.zip || true
+      curl -sL "https://github.com/ayman708-UX/torrserver_flutter/releases/download/v${VERSION}/TorrServerKit.xcframework.zip" -o TorrServerKit.xcframework.zip || true
       if [ -f "TorrServerKit.xcframework.zip" ]; then
         unzip -q TorrServerKit.xcframework.zip -d . || true
         rm -f TorrServerKit.xcframework.zip

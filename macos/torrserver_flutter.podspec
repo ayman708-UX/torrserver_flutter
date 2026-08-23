@@ -5,7 +5,7 @@ Pod::Spec.new do |s|
   s.description      = <<-DESC
 Flutter package wrapping TorrServer for macOS desktop via subprocess model.
                        DESC
-  s.homepage         = 'https://github.com/torrserver-flutter/torrserver_flutter'
+  s.homepage         = 'https://github.com/ayman708-UX/torrserver_flutter'
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'TorrServer Flutter Contributors' => 'contributors@torrserver.local' }
 
@@ -30,7 +30,7 @@ Flutter package wrapping TorrServer for macOS desktop via subprocess model.
       chmod +x bin/torrserver
     elif [ ! -f "bin/torrserver" ]; then
       echo "Downloading TorrServer macOS binary from GitHub Releases..."
-      curl -sL "https://github.com/torrserver-flutter/torrserver_flutter/releases/download/v${VERSION}/torrserver-darwin-arm64" -o bin/torrserver || true
+      curl -sL "https://github.com/ayman708-UX/torrserver_flutter/releases/download/v${VERSION}/torrserver-darwin-arm64" -o bin/torrserver || true
       chmod +x bin/torrserver || true
     fi
   CMD
