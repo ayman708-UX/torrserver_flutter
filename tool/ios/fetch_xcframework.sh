@@ -3,7 +3,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-VERSION="0.0.1"
+VERSION="0.0.2"
 TARGET_DIR="$ROOT_DIR/ios/TorrServerKit.xcframework"
 
 if [ -d "$ROOT_DIR/dist/TorrServerKit.xcframework" ]; then
