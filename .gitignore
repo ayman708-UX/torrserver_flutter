@@ -1,0 +1,39 @@
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+dist/
+release-assets/
+torrserver_cache/
+*.exe
+*.dll
+*.so
+*.dylib
+*.log
+
+# Android
+.gradle/
+local.properties
+**/android/**/build/
+**/android/**/.gradle/
+**/android/**/src/main/jniLibs/
+
+# iOS / macOS
+Pods/
+Podfile.lock
+.symlinks/
+*.xcframework/
+*.xcframework.zip
+tool/go-shim/torrserver-src/
+
+# Windows / Linux CMake
+CMakeUserPresets.json
+**/windows/flutter/ephemeral/
+**/linux/flutter/ephemeral/
+
+# IDE
+.idea/
+.vscode/
+*.iml

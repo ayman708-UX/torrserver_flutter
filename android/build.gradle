@@ -1,0 +1,85 @@
+group 'com.torrserver.torrserver_flutter'
+version '1.0.0'
+
+buildscript {
+    ext.kotlin_version = '1.9.0'
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.2.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+android {
+    namespace 'com.torrserver.torrserver_flutter'
+    compileSdkVersion 34
+
+    defaultConfig {
+        minSdkVersion 21
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    lintOptions {
+        disable 'InvalidPackage'
+    }
+
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ['src/main/jniLibs']
+            assets.srcDirs = ['src/main/assets']
+        }
+    }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+    implementation "androidx.core:core-ktx:1.12.0"
+}
+
+// Custom Gradle task to download TorrServer Android NDK binaries per ABI
+task downloadTorrServerBinaries {
+    doLast {
+        def version = "1.0.0"
+        def localBin = System.getenv("TORRSERVER_FLUTTER_LOCAL_BINARIES")
+        def jniDir = file("src/main/jniLibs")
+        def abis = ["arm64-v8a": "torrserver-android-arm64",
+                    "x86_64": "torrserver-android-amd64",
+                    "armeabi-v7a": "torrserver-android-arm7",
+                    "x86": "torrserver-android-386"]
+
+        abis.each { abi, binName ->
+            def abiFolder = file("${jniDir}/${abi}")
+            abiFolder.mkdirs()
+            def targetFile = file("${abiFolder}/libtorrserver.so")
+
+            if (localBin != null && file("${localBin}/${binName}").exists()) {
+                println "Copying local TorrServer binary for ${abi} from ${localBin}"
+                targetFile.bytes = file("${localBin}/${binName}").bytes
+            } else if (!targetFile.exists()) {
+                println "Downloading TorrServer binary for ${abi} (v${version})..."
+                try {
+                    def url = "https://github.com/torrserver-flutter/torrserver_flutter/releases/download/v${version}/${binName}"
+                    new URL(url).withInputStream { i -> targetFile.withOutputStream { it << i } }
+                } catch (Exception e) {
+                    println "Warning: Failed to download TorrServer binary for ${abi}: ${e.message}"
+                }
+            }
+        }
+    }
+}
+
+preBuild.dependsOn downloadTorrServerBinaries

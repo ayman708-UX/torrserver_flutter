@@ -1,0 +1,41 @@
+name: torrserver_flutter
+description: A Flutter package wrapping TorrServer for streaming torrents via HTTP API on Windows, Linux, macOS, Android, and iOS.
+version: 1.0.0
+homepage: https://github.com/torrserver-flutter/torrserver_flutter
+repository: https://github.com/torrserver-flutter/torrserver_flutter
+issue_tracker: https://github.com/torrserver-flutter/torrserver_flutter/issues
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.10.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  ffi: ^2.1.2
+  http: ^1.2.0
+  meta: ^1.11.0
+  path: ^1.9.0
+  path_provider: ^2.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  integration_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.torrserver.torrserver_flutter
+        pluginClass: TorrserverFlutterPlugin
+      ios:
+        pluginClass: TorrserverFlutterPlugin
+      linux:
+        pluginClass: TorrserverFlutterPlugin
+      macos:
+        pluginClass: TorrserverFlutterPlugin
+      windows:
+        pluginClass: TorrserverFlutterPluginCApi

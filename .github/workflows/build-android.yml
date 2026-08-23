@@ -1,0 +1,95 @@
+name: Build Android NDK Binaries
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    name: Android NDK Build (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: arm64
+            goarch: arm64
+            goarm: ""
+            compiler: aarch64-linux-android21-clang
+            bin_name: torrserver-android-arm64
+          - arch: amd64
+            goarch: amd64
+            goarm: ""
+            compiler: x86_64-linux-android21-clang
+            bin_name: torrserver-android-amd64
+          - arch: arm7
+            goarch: arm
+            goarm: "7"
+            compiler: armv7a-linux-androideabi21-clang
+            bin_name: torrserver-android-arm7
+          - arch: 386
+            goarch: 386
+            goarm: ""
+            compiler: i686-linux-android21-clang
+            bin_name: torrserver-android-386
+
+    env:
+      NDK_VERSION: "25.2.9519653"
+      NODE_OPTIONS: --openssl-legacy-provider
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Android NDK (${{ env.NDK_VERSION }})
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r25c
+          link-to-sdk: true
+
+      - name: Clone upstream TorrServer
+        run: |
+          git clone --depth 1 https://github.com/YouROK/TorrServer.git upstream_ts
+
+      - name: Build Web Assets
+        run: |
+          cd upstream_ts
+          go run gen_web.go
+
+      - name: Cross-compile for Android (${{ matrix.arch }})
+        run: |
+          mkdir -p dist
+          export NDK_TOOLCHAIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64"
+          export CC="$NDK_TOOLCHAIN/bin/${{ matrix.compiler }}"
+          export CXX="$NDK_TOOLCHAIN/bin/${{ matrix.compiler }}++"
+          export CGO_ENABLED=1
+          export GOOS=android
+          export GOARCH=${{ matrix.goarch }}
+          if [ -n "${{ matrix.goarm }}" ]; then
+            export GOARM=${{ matrix.goarm }}
+          fi
+
+          cd upstream_ts/server
+          go build -ldflags='-s -w -checklinkname=0' -tags=nosqlite -trimpath -o "${{ github.workspace }}/dist/${{ matrix.bin_name }}" ./cmd
+
+      - name: Upload Android Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.bin_name }}
+          path: dist/${{ matrix.bin_name }}
+          if-no-files-found: error
