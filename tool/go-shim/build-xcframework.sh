@@ -21,8 +21,8 @@ fi
 
 echo "=== Building TorrServerKit.xcframework ==="
 gomobile bind \
-  -target=ios/arm64,iossimulator/arm64 \
-  -iosversion=13.0 \
+  -target=ios/arm64,iossimulator/arm64,iossimulator/amd64 \
+  -iosversion=14.0 \
   -tags=nosqlite \
   -ldflags="-s -w -checklinkname=0" \
   -trimpath \

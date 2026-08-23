@@ -56,7 +56,7 @@ jobs:
           go mod tidy
 
           gomobile bind \
-            -target=ios/arm64,iossimulator/arm64 \
+            -target=ios/arm64,iossimulator/arm64,iossimulator/amd64 \
             -iosversion=14.0 \
             -tags=nosqlite \
             -ldflags="-s -w -checklinkname=0" \
@@ -74,6 +74,19 @@ jobs:
         run: |
           chmod +x tool/ios/fetch_xcframework.sh
           ./tool/ios/fetch_xcframework.sh
+
+      - name: Debug - locate TorrServerKit & inspect XCFramework slices
+        run: |
+          echo "=== Locating TorrServerKit ==="
+          find . -iname "TorrServerKit*" -not -path "*/node_modules/*"
+          echo "=== Podspec vendored_frameworks line ==="
+          grep -n "vendored_frameworks" ios/torrserver_flutter.podspec || true
+          echo "=== Inspecting XCFramework Info.plist & lipo architectures ==="
+          XCF=$(find . -iname "TorrServerKit.xcframework" -type d | head -1)
+          if [ -n "$XCF" ]; then
+            cat "$XCF/Info.plist"
+            lipo -info "$XCF"/*/TorrServerKit.framework/TorrServerKit 2>/dev/null || true
+          fi
 
       - name: Build Example iOS App for Simulator
         run: |
