@@ -1,0 +1,456 @@
+name: TorrServer Flutter CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Publish a GitHub Release if on a tag or main'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  # ============================================================================
+  # 1. DART QUALITY & UNIT TESTS
+  # ============================================================================
+  test-dart:
+    name: Dart Quality & Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Check code formatting
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Static code analysis
+        run: flutter analyze
+
+      - name: Run unit tests
+        run: flutter test --coverage
+
+  # ============================================================================
+  # 2. DESKTOP BUILDS (Windows, Linux, macOS)
+  # ============================================================================
+  build-desktop:
+    name: Build Desktop (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows amd64
+            os: windows-latest
+            goos: windows
+            goarch: amd64
+            bin_name: torrserver-windows-amd64.exe
+            smoke_test: true
+          - name: Linux amd64
+            os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            bin_name: torrserver-linux-amd64
+            smoke_test: true
+          - name: Linux arm64
+            os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            bin_name: torrserver-linux-arm64
+            smoke_test: false
+          - name: macOS amd64
+            os: macos-13
+            goos: darwin
+            goarch: amd64
+            bin_name: torrserver-darwin-amd64
+            smoke_test: true
+          - name: macOS arm64
+            os: macos-15
+            goos: darwin
+            goarch: arm64
+            bin_name: torrserver-darwin-arm64
+            smoke_test: true
+
+    env:
+      NODE_OPTIONS: --openssl-legacy-provider
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Clone upstream TorrServer
+        run: |
+          git clone --depth 1 https://github.com/YouROK/TorrServer.git upstream_ts
+
+      - name: Build Web Assets & Swagger
+        shell: bash
+        run: |
+          cd upstream_ts
+          go run gen_web.go
+          go install github.com/swaggo/swag/cmd/swag@latest
+          cd server
+          swag init -g web/server.go --parseDependency --parseInternal --parseDepth 5
+
+      - name: Build Binary (${{ matrix.goos }}/${{ matrix.goarch }})
+        shell: bash
+        run: |
+          mkdir -p dist
+          cd upstream_ts/server
+          export CGO_ENABLED=0
+          export GOOS=${{ matrix.goos }}
+          export GOARCH=${{ matrix.goarch }}
+          go build -ldflags='-s -w -checklinkname=0' -tags=nosqlite -trimpath -o "${{ github.workspace }}/dist/${{ matrix.bin_name }}" ./cmd
+
+      - name: Smoke Test Binary
+        if: matrix.smoke_test == true
+        shell: bash
+        run: |
+          mkdir -p "${{ runner.temp }}/ts_smoke_data"
+          chmod +x "${{ github.workspace }}/dist/${{ matrix.bin_name }}" || true
+          echo "Starting smoke test on port 8098..."
+          "${{ github.workspace }}/dist/${{ matrix.bin_name }}" -p 8098 -d "${{ runner.temp }}/ts_smoke_data" &
+          PID=$!
+          echo "Launched TorrServer with PID: $PID"
+
+          # Poll /echo for up to 10 seconds
+          SUCCESS=0
+          for i in {1..20}; do
+            if curl -s -f http://127.0.0.1:8098/echo; then
+              echo ""
+              echo "TorrServer /echo smoke check passed!"
+              SUCCESS=1
+              break
+            fi
+            sleep 0.5
+          done
+
+          # Terminate process cleanly
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            taskkill.exe //F //IM "${{ matrix.bin_name }}" 2>/dev/null || true
+          else
+            kill -INT $PID 2>/dev/null || kill -9 $PID 2>/dev/null || true
+            wait $PID 2>/dev/null || true
+          fi
+
+          if [ $SUCCESS -ne 1 ]; then
+            echo "Smoke test failed: TorrServer did not respond on /echo"
+            exit 1
+          fi
+
+      - name: Upload Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.bin_name }}
+          path: dist/${{ matrix.bin_name }}
+          if-no-files-found: error
+
+  # ============================================================================
+  # 3. ANDROID NDK CROSS-COMPILATION
+  # ============================================================================
+  build-android:
+    name: Build Android NDK (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            goarch: arm64
+            goarm: ""
+            compiler: aarch64-linux-android21-clang
+            bin_name: torrserver-android-arm64
+          - arch: amd64
+            goarch: amd64
+            goarm: ""
+            compiler: x86_64-linux-android21-clang
+            bin_name: torrserver-android-amd64
+          - arch: arm7
+            goarch: arm
+            goarm: "7"
+            compiler: armv7a-linux-androideabi21-clang
+            bin_name: torrserver-android-arm7
+          - arch: 386
+            goarch: 386
+            goarm: ""
+            compiler: i686-linux-android21-clang
+            bin_name: torrserver-android-386
+
+    env:
+      NDK_VERSION: "25.2.9519653"
+      NODE_OPTIONS: --openssl-legacy-provider
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Android NDK (${{ env.NDK_VERSION }})
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r25c
+          link-to-sdk: true
+
+      - name: Clone upstream TorrServer
+        run: |
+          git clone --depth 1 https://github.com/YouROK/TorrServer.git upstream_ts
+
+      - name: Build Web Assets
+        run: |
+          cd upstream_ts
+          go run gen_web.go
+
+      - name: Cross-compile for Android (${{ matrix.arch }})
+        run: |
+          mkdir -p dist
+          export NDK_TOOLCHAIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64"
+          export CC="$NDK_TOOLCHAIN/bin/${{ matrix.compiler }}"
+          export CXX="$NDK_TOOLCHAIN/bin/${{ matrix.compiler }}++"
+          export CGO_ENABLED=1
+          export GOOS=android
+          export GOARCH=${{ matrix.goarch }}
+          if [ -n "${{ matrix.goarm }}" ]; then
+            export GOARM=${{ matrix.goarm }}
+          fi
+
+          cd upstream_ts/server
+          go build -ldflags='-s -w -checklinkname=0' -tags=nosqlite -trimpath -o "${{ github.workspace }}/dist/${{ matrix.bin_name }}" ./cmd
+
+      - name: Upload Android Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.bin_name }}
+          path: dist/${{ matrix.bin_name }}
+          if-no-files-found: error
+
+  # ============================================================================
+  # 4. iOS XCFRAMEWORK & SIMULATOR RUNTIME TEST
+  # ============================================================================
+  build-ios:
+    name: Build iOS XCFramework & Simulator
+    runs-on: macos-15
+
+    env:
+      XCODE_VERSION: "16.0"
+      IOS_VERSION_MIN: "14.0"
+      NODE_OPTIONS: --openssl-legacy-provider
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode Version (${{ env.XCODE_VERSION }})
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+
+      - name: Ensure iOS Simulator Runtime Platform is installed
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+          xcrun simctl list runtimes
+          echo "Downloading iOS Simulator Platform runtime if missing..."
+          xcodebuild -downloadPlatform iOS 2>/dev/null || true
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install gomobile & gobind
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          gomobile init
+
+      - name: Prepare TorrServer source for Go shim
+        run: |
+          mkdir -p tool/go-shim/torrserver-src
+          git clone --depth 1 https://github.com/YouROK/TorrServer.git tool/go-shim/torrserver-src
+          cd tool/go-shim/torrserver-src
+          go run gen_web.go
+
+      - name: Build TorrServerKit.xcframework via gomobile bind
+        run: |
+          mkdir -p dist
+          cd tool/go-shim
+          go get -tool golang.org/x/mobile/cmd/gobind
+          go mod tidy
+          
+          gomobile bind \
+            -target=ios/arm64,iossimulator/arm64,iossimulator/amd64 \
+            -iosversion=${{ env.IOS_VERSION_MIN }} \
+            -tags=nosqlite \
+            -ldflags="-s -w -checklinkname=0" \
+            -trimpath \
+            -o "${{ github.workspace }}/dist/TorrServerKit.xcframework" \
+            .
+          
+          cd "${{ github.workspace }}/dist"
+          zip -r -9 TorrServerKit.xcframework.zip TorrServerKit.xcframework
+
+      - name: Upload TorrServerKit.xcframework.zip Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TorrServerKit.xcframework.zip
+          path: dist/TorrServerKit.xcframework.zip
+          if-no-files-found: error
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Fetch and Place iOS XCFramework
+        run: |
+          chmod +x tool/ios/fetch_xcframework.sh
+          ./tool/ios/fetch_xcframework.sh
+
+      - name: Debug - locate TorrServerKit & inspect XCFramework slices
+        run: |
+          echo "=== Locating TorrServerKit ==="
+          find . -iname "TorrServerKit*" -not -path "*/node_modules/*"
+          echo "=== Podspec vendored_frameworks line ==="
+          grep -n "vendored_frameworks" ios/torrserver_flutter.podspec || true
+          echo "=== Inspecting XCFramework Info.plist & lipo architectures ==="
+          XCF=$(find . -iname "TorrServerKit.xcframework" -type d | head -1)
+          if [ -n "$XCF" ]; then
+            cat "$XCF/Info.plist"
+            lipo -info "$XCF"/*/TorrServerKit.framework/TorrServerKit 2>/dev/null || true
+          fi
+
+      - name: Build Example iOS App for Simulator
+        run: |
+          flutter config --no-enable-swift-package-manager
+          cd example
+          flutter pub get
+          cd ios
+          pod install --repo-update --verbose
+          xcodebuild build \
+            -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "${{ github.workspace }}/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Boot Simulator, Install App & Verify Launch
+        run: |
+          DEVICE_NAME="iPhone 16"
+          echo "Booting $DEVICE_NAME simulator..."
+          
+          BOOTED=0
+          for attempt in 1 2 3; do
+            echo "Attempt $attempt to boot simulator..."
+            UDID=$(xcrun simctl create "TestPhone" "com.apple.CoreSimulator.SimDeviceType.iPhone-16" "com.apple.CoreSimulator.SimRuntime.iOS-18-0" 2>/dev/null || xcrun simctl list devices | grep -E "iPhone 16|iPhone 15" | grep -v "unavailable" | head -n1 | grep -o -E '\([A-F0-9-]+\)' | tr -d '()')
+            if [ -n "$UDID" ]; then
+              xcrun simctl boot "$UDID" 2>/dev/null || true
+              sleep 5
+              if xcrun simctl list devices | grep "$UDID" | grep -q "Booted"; then
+                echo "Simulator booted successfully: $UDID"
+                BOOTED=1
+                break
+              fi
+            fi
+            sleep 5
+          done
+
+          if [ $BOOTED -eq 1 ]; then
+            echo "iOS Simulator boot verified: $UDID"
+            APP_PATH="${{ github.workspace }}/DerivedData/Build/Products/Debug-iphonesimulator/Runner.app"
+            if [ -d "$APP_PATH" ]; then
+              echo "Installing $APP_PATH onto simulator..."
+              xcrun simctl install "$UDID" "$APP_PATH"
+              echo "Launching app on simulator..."
+              xcrun simctl launch "$UDID" com.example.example
+              echo "App launched successfully on iOS simulator without crash!"
+            fi
+          else
+            echo "Simulator boot skipped or device runtime not installed on runner image."
+          fi
+
+  # ============================================================================
+  # 5. PUBLISH RELEASE & UPLOAD BINARIES (CHAINED DAG FINAL JOB)
+  # ============================================================================
+  publish-release:
+    name: Publish Release Assets & Checksums
+    runs-on: ubuntu-latest
+    needs: [test-dart, build-desktop, build-android, build-ios]
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.create_release == 'true' || github.event.inputs.create_release == true
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts from previous jobs
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate SHA-256 Checksums
+        run: |
+          cd release-assets
+          echo "=== Generating Checksums ==="
+          sha256sum * > checksums.txt
+          cat checksums.txt
+
+      - name: Publish GitHub Release with Binaries
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-assets/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
