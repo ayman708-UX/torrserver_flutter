@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.0
+## 0.0.1
 
 - Initial production release of `torrserver_flutter`.
 - Unified `TorrServerController` supporting Windows, Linux, macOS, Android, and iOS.
