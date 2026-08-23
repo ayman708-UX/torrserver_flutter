@@ -11,7 +11,7 @@ on:
 env:
   GO_VERSION: "stable"
   XCODE_VERSION: "16.0"
-  IOS_VERSION_MIN: "13.0"
+  IOS_VERSION_MIN: "14.0"
   NODE_OPTIONS: --openssl-legacy-provider
 
 jobs:

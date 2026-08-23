@@ -57,7 +57,7 @@ jobs:
 
           gomobile bind \
             -target=ios/arm64,iossimulator/arm64 \
-            -iosversion=13.0 \
+            -iosversion=14.0 \
             -tags=nosqlite \
             -ldflags="-s -w -checklinkname=0" \
             -trimpath \
