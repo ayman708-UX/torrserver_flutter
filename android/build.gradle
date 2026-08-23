@@ -53,7 +53,7 @@ dependencies {
 // Custom Gradle task to download TorrServer Android NDK binaries per ABI
 task downloadTorrServerBinaries {
     doLast {
-        def version = "1.0.0"
+        def version = "0.0.1"
         def localBin = System.getenv("TORRSERVER_FLUTTER_LOCAL_BINARIES")
         def jniDir = file("src/main/jniLibs")
         def abis = ["arm64-v8a": "torrserver-android-arm64",

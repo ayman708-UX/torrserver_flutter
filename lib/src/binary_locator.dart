@@ -50,6 +50,7 @@ class BinaryLocator {
       searchDirs.add(appSupport);
       searchDirs.add(Directory(p.join(appSupport.path, 'torrserver')));
       searchDirs.add(Directory(p.join(appSupport.path, 'bin')));
+      searchDirs.add(Directory(p.join(appSupport.parent.path, 'lib')));
     } catch (_) {}
 
     searchDirs.add(Directory.current);

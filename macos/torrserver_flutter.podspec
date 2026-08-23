@@ -20,17 +20,24 @@ Flutter package wrapping TorrServer for macOS desktop via subprocess model.
   # Download macOS TorrServer binary hook
   s.prepare_command = <<-CMD
     set -e
-    VERSION="1.0.0"
+    VERSION="0.0.1"
     LOCAL_BIN="${TORRSERVER_FLUTTER_LOCAL_BINARIES}"
     mkdir -p bin
 
-    if [ -n "$LOCAL_BIN" ] && [ -f "$LOCAL_BIN/torrserver-darwin-arm64" ]; then
+    ARCH=$(uname -m)
+    if [ "$ARCH" = "x86_64" ]; then
+      BIN_NAME="torrserver-darwin-amd64"
+    else
+      BIN_NAME="torrserver-darwin-arm64"
+    fi
+
+    if [ -n "$LOCAL_BIN" ] && [ -f "$LOCAL_BIN/$BIN_NAME" ]; then
       echo "Using local macOS binary from $LOCAL_BIN"
-      cp "$LOCAL_BIN/torrserver-darwin-arm64" bin/torrserver
+      cp "$LOCAL_BIN/$BIN_NAME" bin/torrserver
       chmod +x bin/torrserver
     elif [ ! -f "bin/torrserver" ]; then
-      echo "Downloading TorrServer macOS binary from GitHub Releases..."
-      curl -sL "https://github.com/ayman708-UX/torrserver_flutter/releases/download/v${VERSION}/torrserver-darwin-arm64" -o bin/torrserver || true
+      echo "Downloading TorrServer macOS binary ($BIN_NAME) from GitHub Releases..."
+      curl -sL "https://github.com/ayman708-UX/torrserver_flutter/releases/download/v${VERSION}/${BIN_NAME}" -o bin/torrserver || true
       chmod +x bin/torrserver || true
     fi
   CMD

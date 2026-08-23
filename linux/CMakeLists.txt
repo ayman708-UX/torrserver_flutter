@@ -25,7 +25,7 @@ target_link_libraries(${PLUGIN_NAME} PRIVATE flutter)
 target_link_libraries(${PLUGIN_NAME} PRIVATE PkgConfig::GTK)
 
 # --- TorrServer Native Binary Setup for Linux ---
-set(TORRSERVER_VERSION "1.0.0")
+set(TORRSERVER_VERSION "0.0.1")
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
   set(TORRSERVER_BIN_NAME "torrserver-linux-arm64")
 else()
@@ -62,5 +62,6 @@ endif()
 # List of absolute paths to libraries that should be bundled with the plugin
 set(torrserver_flutter_bundled_libraries
   "$<TARGET_FILE:${PLUGIN_NAME}>"
+  "${TORRSERVER_CACHED_BIN}"
   PARENT_SCOPE
 )

@@ -25,7 +25,7 @@ target_include_directories(${PLUGIN_NAME} INTERFACE
 target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)
 
 # --- TorrServer Native Binary Setup ---
-set(TORRSERVER_VERSION "1.0.0")
+set(TORRSERVER_VERSION "0.0.1")
 set(TORRSERVER_BIN_NAME "torrserver-windows-amd64.exe")
 set(TORRSERVER_DEST_NAME "torrserver.exe")
 set(LOCAL_BIN_DIR "$ENV{TORRSERVER_FLUTTER_LOCAL_BINARIES}")
@@ -57,5 +57,6 @@ endif()
 # List of absolute paths to libraries that should be bundled with the plugin
 set(torrserver_flutter_bundled_libraries
   "$<TARGET_FILE:${PLUGIN_NAME}>"
+  "${TORRSERVER_CACHED_BIN}"
   PARENT_SCOPE
 )

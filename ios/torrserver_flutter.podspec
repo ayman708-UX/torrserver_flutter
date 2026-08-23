@@ -27,7 +27,7 @@ A Flutter package embedding TorrServer as an in-process XCFramework for iOS.
   # Download XCFramework hook
   s.prepare_command = <<-CMD
     set -e
-    VERSION="1.0.0"
+    VERSION="0.0.1"
     LOCAL_BIN="${TORRSERVER_FLUTTER_LOCAL_BINARIES}"
 
     if [ -n "$LOCAL_BIN" ] && [ -d "$LOCAL_BIN/TorrServerKit.xcframework" ]; then
