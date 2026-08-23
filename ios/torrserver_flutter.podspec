@@ -40,8 +40,23 @@ A Flutter package embedding TorrServer as an in-process XCFramework for iOS.
       unzip -q "$LOCAL_BIN/TorrServerKit.xcframework.zip" -d .
     elif [ ! -d "TorrServerKit.xcframework" ]; then
       echo "Downloading TorrServerKit.xcframework from GitHub Releases..."
+      curl -sL "https://github.com/ayman708-UX/torrserver_flutter/releases/download/v${VERSION}/checksums.txt" -o checksums.txt || true
       curl -sL "https://github.com/ayman708-UX/torrserver_flutter/releases/download/v${VERSION}/TorrServerKit.xcframework.zip" -o TorrServerKit.xcframework.zip || true
       if [ -f "TorrServerKit.xcframework.zip" ]; then
+        if [ -f "checksums.txt" ]; then
+          EXPECTED_HASH=$(grep "TorrServerKit.xcframework.zip" checksums.txt | awk '{print $1}')
+          if [ -n "$EXPECTED_HASH" ]; then
+            COMPUTED_HASH=$(shasum -a 256 TorrServerKit.xcframework.zip | awk '{print $1}')
+            if [ "$EXPECTED_HASH" != "$COMPUTED_HASH" ]; then
+              echo "Error: SHA-256 mismatch for TorrServerKit.xcframework.zip (expected $EXPECTED_HASH, got $COMPUTED_HASH)"
+              rm -f TorrServerKit.xcframework.zip checksums.txt
+              exit 1
+            fi
+            echo "Verified SHA-256 for TorrServerKit.xcframework.zip: $COMPUTED_HASH"
+          fi
+          rm -f checksums.txt
+        fi
+
         unzip -q TorrServerKit.xcframework.zip -d . || true
         rm -f TorrServerKit.xcframework.zip
       fi

@@ -47,8 +47,23 @@ Flutter package wrapping TorrServer for macOS desktop via subprocess model.
       chmod 755 bin/torrserver
     elif [ ! -f "bin/torrserver" ]; then
       echo "Downloading TorrServer macOS compressed archive ($ARCHIVE_NAME) from GitHub Releases..."
+      curl -sL "https://github.com/ayman708-UX/torrserver_flutter/releases/download/v${VERSION}/checksums.txt" -o "bin/checksums.txt" || true
       curl -sL "https://github.com/ayman708-UX/torrserver_flutter/releases/download/v${VERSION}/${ARCHIVE_NAME}" -o "bin/${ARCHIVE_NAME}" || true
       if [ -f "bin/${ARCHIVE_NAME}" ]; then
+        if [ -f "bin/checksums.txt" ]; then
+          EXPECTED_HASH=$(grep "$ARCHIVE_NAME" bin/checksums.txt | awk '{print $1}')
+          if [ -n "$EXPECTED_HASH" ]; then
+            COMPUTED_HASH=$(shasum -a 256 "bin/${ARCHIVE_NAME}" | awk '{print $1}')
+            if [ "$EXPECTED_HASH" != "$COMPUTED_HASH" ]; then
+              echo "Error: SHA-256 checksum mismatch for $ARCHIVE_NAME (expected $EXPECTED_HASH, got $COMPUTED_HASH)"
+              rm -f "bin/${ARCHIVE_NAME}" bin/checksums.txt
+              exit 1
+            fi
+            echo "Verified SHA-256 for $ARCHIVE_NAME: $COMPUTED_HASH"
+          fi
+          rm -f bin/checksums.txt
+        fi
+
         tar -xzf "bin/${ARCHIVE_NAME}" -C bin/ || true
         if [ -f "bin/$BIN_NAME" ]; then
           mv "bin/$BIN_NAME" bin/torrserver || true

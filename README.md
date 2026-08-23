@@ -118,6 +118,5 @@ Ensure your `android/app/src/main/AndroidManifest.xml` includes network and fore
 ---
 
 ## License
-
-- Flutter Dart wrapper code: [MIT License](LICENSE)
-- Embedded TorrServer engine: [GNU General Public License v3.0](LICENSE-GPL3)
+ 
+This project is licensed under the [GNU General Public License v3.0](LICENSE).

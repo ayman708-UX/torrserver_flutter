@@ -59,16 +59,44 @@ dependencies {
     implementation "androidx.core:core-ktx:1.12.0"
 }
 
+import java.security.MessageDigest
+
 // Custom Gradle task to download TorrServer Android NDK binaries per ABI
 task downloadTorrServerBinaries {
     doLast {
         def version = "0.0.3"
         def localBin = System.getenv("TORRSERVER_FLUTTER_LOCAL_BINARIES")
         def jniDir = file("src/main/jniLibs")
+        def versionMarker = file("${jniDir}/.version")
         def abis = ["arm64-v8a": "torrserver-android-arm64",
                     "x86_64": "torrserver-android-amd64",
                     "armeabi-v7a": "torrserver-android-arm7",
                     "x86": "torrserver-android-386"]
+
+        // If version changed, clean out stale binaries
+        if (versionMarker.exists() && versionMarker.text.trim() != version) {
+            println "TorrServer plugin version changed to ${version}. Cleaning stale jniLibs..."
+            jniDir.deleteDir()
+        }
+
+        // Fetch release checksums if downloading remotely
+        def checksumMap = [:]
+        if (localBin == null) {
+            try {
+                def checksumUrl = "https://github.com/ayman708-UX/torrserver_flutter/releases/download/v${version}/checksums.txt"
+                def checksumText = new URL(checksumUrl).text
+                checksumText.eachLine { line ->
+                    def parts = line.trim().split(/\s+/)
+                    if (parts.length >= 2) {
+                        def hash = parts[0].trim()
+                        def filename = parts[1].trim().replaceFirst(/^[\*\/]/, '')
+                        checksumMap[filename] = hash
+                    }
+                }
+            } catch (Exception e) {
+                println "Note: Checksums file fetch deferred: ${e.message}"
+            }
+        }
 
         abis.each { abi, binName ->
             def abiFolder = file("${jniDir}/${abi}")
@@ -96,6 +124,20 @@ task downloadTorrServerBinaries {
                     def url = "https://github.com/ayman708-UX/torrserver_flutter/releases/download/v${version}/${zipName}"
                     def tempZip = file("${abiFolder}/temp_${zipName}")
                     new URL(url).withInputStream { i -> tempZip.withOutputStream { it << i } }
+
+                    // Checksum verification before extraction
+                    if (checksumMap.containsKey(zipName)) {
+                        def expectedHash = checksumMap[zipName]
+                        def digest = MessageDigest.getInstance("SHA-256")
+                        tempZip.eachByte(4096) { buffer, length -> digest.update(buffer, 0, length) }
+                        def computedHash = digest.digest().encodeHex().toString()
+                        if (!computedHash.equalsIgnoreCase(expectedHash)) {
+                            tempZip.delete()
+                            throw new GradleException("SHA-256 checksum mismatch for ${zipName}! Expected: ${expectedHash}, got: ${computedHash}")
+                        }
+                        println "Verified SHA-256 for ${zipName}: ${computedHash}"
+                    }
+
                     copy {
                         from zipTree(tempZip)
                         into abiFolder
@@ -110,6 +152,9 @@ task downloadTorrServerBinaries {
                 }
             }
         }
+
+        versionMarker.parentFile.mkdirs()
+        versionMarker.text = version
     }
 }
 

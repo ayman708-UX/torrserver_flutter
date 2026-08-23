@@ -57,6 +57,28 @@ elseif(NOT EXISTS "${TORRSERVER_CACHED_BIN}")
   )
   list(GET DOWNLOAD_STATUS 0 STATUS_CODE)
   if(STATUS_CODE EQUAL 0)
+    # Verify SHA-256 checksum against release checksums.txt if available
+    file(DOWNLOAD "https://github.com/ayman708-UX/torrserver_flutter/releases/download/v${TORRSERVER_VERSION}/checksums.txt"
+      "${TORRSERVER_CACHE_DIR}/checksums.txt"
+      STATUS CHECKSUM_STATUS
+    )
+    list(GET CHECKSUM_STATUS 0 CS_CODE)
+    if(CS_CODE EQUAL 0)
+      file(READ "${TORRSERVER_CACHE_DIR}/checksums.txt" CHECKSUM_FILE_CONTENT)
+      file(SHA256 "${TORRSERVER_CACHE_DIR}/${TORRSERVER_ZIP_NAME}" COMPUTED_SHA256)
+      if(CHECKSUM_FILE_CONTENT MATCHES "([a-fA-F0-9]+)[ \t]+[*]?${TORRSERVER_ZIP_NAME}")
+        set(EXPECTED_SHA256 "${CMAKE_MATCH_1}")
+        string(TOLOWER "${COMPUTED_SHA256}" COMPUTED_SHA256)
+        string(TOLOWER "${EXPECTED_SHA256}" EXPECTED_SHA256)
+        if(NOT COMPUTED_SHA256 STREQUAL EXPECTED_SHA256)
+          file(REMOVE "${TORRSERVER_CACHE_DIR}/${TORRSERVER_ZIP_NAME}")
+          message(FATAL_ERROR "SHA-256 mismatch for ${TORRSERVER_ZIP_NAME}! Expected: ${EXPECTED_SHA256}, got: ${COMPUTED_SHA256}")
+        endif()
+        message(STATUS "Verified SHA-256 for ${TORRSERVER_ZIP_NAME}: ${COMPUTED_SHA256}")
+      endif()
+      file(REMOVE "${TORRSERVER_CACHE_DIR}/checksums.txt")
+    endif()
+
     file(ARCHIVE_EXTRACT INPUT "${TORRSERVER_CACHE_DIR}/${TORRSERVER_ZIP_NAME}" DESTINATION "${TORRSERVER_CACHE_DIR}")
     if(EXISTS "${TORRSERVER_CACHE_DIR}/${TORRSERVER_BIN_NAME}")
       file(RENAME "${TORRSERVER_CACHE_DIR}/${TORRSERVER_BIN_NAME}" "${TORRSERVER_CACHED_BIN}")
