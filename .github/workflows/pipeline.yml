@@ -76,11 +76,11 @@ jobs:
             bin_name: torrserver-linux-arm64
             smoke_test: false
           - name: macOS amd64
-            os: macos-13
+            os: macos-15
             goos: darwin
             goarch: amd64
             bin_name: torrserver-darwin-amd64
-            smoke_test: true
+            smoke_test: false
           - name: macOS arm64
             os: macos-15
             goos: darwin
