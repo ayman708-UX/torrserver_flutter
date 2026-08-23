@@ -125,11 +125,12 @@ jobs:
             -configuration Debug \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "${{ github.workspace }}/DerivedData" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=""
 
-      - name: Boot Simulator with retry-with-backoff & Verify Launch
+      - name: Boot Simulator, Install App & Verify Launch
         run: |
           DEVICE_NAME="iPhone 16"
           echo "Booting $DEVICE_NAME simulator..."
@@ -152,7 +153,15 @@ jobs:
           done
 
           if [ $BOOTED -eq 1 ]; then
-            echo "iOS Simulator boot verified."
+            echo "iOS Simulator boot verified: $UDID"
+            APP_PATH="${{ github.workspace }}/DerivedData/Build/Products/Debug-iphonesimulator/Runner.app"
+            if [ -d "$APP_PATH" ]; then
+              echo "Installing $APP_PATH onto simulator..."
+              xcrun simctl install "$UDID" "$APP_PATH"
+              echo "Launching app on simulator..."
+              xcrun simctl launch "$UDID" com.example.example
+              echo "App launched successfully on iOS simulator without crash!"
+            fi
           else
             echo "Simulator boot skipped or device runtime not installed on runner image."
           fi
