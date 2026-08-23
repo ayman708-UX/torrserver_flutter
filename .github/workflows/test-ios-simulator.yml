@@ -27,7 +27,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: 'stable'
           cache: true
 
       - name: Set up Node.js
@@ -52,9 +52,7 @@ jobs:
       - name: Build TorrServerKit.xcframework
         run: |
           cd tool/go-shim
-          go get golang.org/x/mobile/cmd/gobind@latest || true
-          go get golang.org/x/mobile/bind@latest || true
-          go get golang.org/x/mobile@latest || true
+          go get -d golang.org/x/mobile/cmd/gobind@latest
           go mod tidy
 
           gomobile bind \

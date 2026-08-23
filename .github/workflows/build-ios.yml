@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  GO_VERSION: "1.25"
+  GO_VERSION: "stable"
   XCODE_VERSION: "16.0"
   IOS_VERSION_MIN: "13.0"
   NODE_OPTIONS: --openssl-legacy-provider
@@ -57,9 +57,7 @@ jobs:
         run: |
           mkdir -p dist
           cd tool/go-shim
-          go get golang.org/x/mobile/cmd/gobind@latest || true
-          go get golang.org/x/mobile/bind@latest || true
-          go get golang.org/x/mobile@latest || true
+          go get -d golang.org/x/mobile/cmd/gobind@latest
           go mod tidy
           
           gomobile bind \
