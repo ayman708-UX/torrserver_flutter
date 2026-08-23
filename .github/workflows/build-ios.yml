@@ -28,6 +28,14 @@ jobs:
         with:
           xcode-version: ${{ env.XCODE_VERSION }}
 
+      - name: Ensure iOS Simulator Runtime Platform is installed
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+          xcrun simctl list runtimes
+          echo "Downloading iOS Simulator Platform runtime if missing..."
+          xcodebuild -downloadPlatform iOS 2>/dev/null || true
+
       - name: Set up Go (${{ env.GO_VERSION }})
         uses: actions/setup-go@v5
         with:
