@@ -70,17 +70,7 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Test Example Pod & Build
+      - name: Build Example iOS App for Simulator
         run: |
           cd example
-          flutter pub get
-          cd ios
-          pod install
-          xcodebuild build \
-            -workspace Runner.xcworkspace \
-            -scheme Runner \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+          flutter build ios --simulator --no-codesign
