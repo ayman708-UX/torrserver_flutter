@@ -107,8 +107,12 @@ jobs:
           done
 
           # Terminate process
-          kill -INT $PID 2>/dev/null || kill -9 $PID 2>/dev/null || true
-          wait $PID 2>/dev/null || true
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            taskkill.exe //F //IM "${{ matrix.bin_name }}" 2>/dev/null || true
+          else
+            kill -INT $PID 2>/dev/null || kill -9 $PID 2>/dev/null || true
+            wait $PID 2>/dev/null || true
+          fi
 
           if [ $SUCCESS -ne 1 ]; then
             echo "Smoke test failed: TorrServer did not respond on /echo"
