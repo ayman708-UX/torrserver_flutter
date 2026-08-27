@@ -5,6 +5,8 @@
 - Fixed iOS in-process engine: replaced fragile FFI dynamic lookup with Swift `MethodChannel` plugin bridge.
 - Converted `TorrServerKit` Go shim to pure Go API for full `gomobile bind` compatibility.
 - Added live iOS Simulator integration test verifying in-process engine startup, healthcheck, and BitTorrent client connectivity in CI.
+- Added iOS App Transport Security (`NSAppTransportSecurity`), local networking keys (`NSLocalNetworkUsageDescription`), and macOS App Sandbox entitlements (`network.client` / `network.server`).
+- Added comprehensive platform permissions setup guide to `README.md`.
 
 ## 0.0.4
 
