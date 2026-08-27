@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'torrserver_flutter'
-  s.version          = '0.0.4'
+  s.version          = '0.0.5'
   s.summary          = 'TorrServer Flutter iOS plugin'
   s.description      = <<-DESC
 A Flutter package embedding TorrServer as an in-process XCFramework for iOS.
@@ -27,7 +27,7 @@ A Flutter package embedding TorrServer as an in-process XCFramework for iOS.
   # Download XCFramework hook
   s.prepare_command = <<-CMD
     set -e
-    VERSION="0.0.4"
+    VERSION="0.0.5"
     LOCAL_BIN="${TORRSERVER_FLUTTER_LOCAL_BINARIES}"
 
     if [ -n "$LOCAL_BIN" ] && [ -d "$LOCAL_BIN/TorrServerKit.xcframework" ]; then

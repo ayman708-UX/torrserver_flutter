@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.5
+
+- Fixed iOS in-process engine: replaced fragile FFI dynamic lookup with Swift `MethodChannel` plugin bridge.
+- Converted `TorrServerKit` Go shim to pure Go API for full `gomobile bind` compatibility.
+- Added live iOS Simulator integration test verifying in-process engine startup, healthcheck, and BitTorrent client connectivity in CI.
+
 ## 0.0.4
 
 - Automatic process lifecycle management on app close/exit via Win32 Job Object (`KILL_ON_JOB_CLOSE`), `AppLifecycleListener`, and OS process signal handlers.

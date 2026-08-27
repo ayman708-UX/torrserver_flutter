@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'torrserver_flutter'
-  s.version          = '0.0.4'
+  s.version          = '0.0.5'
   s.summary          = 'TorrServer Flutter macOS plugin'
   s.description      = <<-DESC
 Flutter package wrapping TorrServer for macOS desktop via subprocess model.
@@ -20,7 +20,7 @@ Flutter package wrapping TorrServer for macOS desktop via subprocess model.
   # Download macOS TorrServer binary hook
   s.prepare_command = <<-CMD
     set -e
-    VERSION="0.0.4"
+    VERSION="0.0.5"
     LOCAL_BIN="${TORRSERVER_FLUTTER_LOCAL_BINARIES}"
     mkdir -p bin
 
