@@ -409,7 +409,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=""
 
-      - name: Boot Simulator, Install App & Verify Launch
+      - name: Boot Simulator & Run Live TorrServer Integration Test
         run: |
           DEVICE_NAME="iPhone 16"
           echo "Booting $DEVICE_NAME simulator..."
@@ -431,17 +431,13 @@ jobs:
           done
 
           if [ $BOOTED -eq 1 ]; then
-            echo "iOS Simulator boot verified: $UDID"
-            APP_PATH="${{ github.workspace }}/DerivedData/Build/Products/Debug-iphonesimulator/Runner.app"
-            if [ -d "$APP_PATH" ]; then
-              echo "Installing $APP_PATH onto simulator..."
-              xcrun simctl install "$UDID" "$APP_PATH"
-              echo "Launching app on simulator..."
-              xcrun simctl launch "$UDID" com.example.example
-              echo "App launched successfully on iOS simulator without crash!"
-            fi
+            echo "Running Live TorrServer Integration Test on iOS simulator ($UDID)..."
+            cd example
+            flutter test integration_test/torrserver_test.dart -d "$UDID"
+            echo "=== iOS TorrServer Engine Live Integration Test Passed! ==="
           else
             echo "Simulator boot skipped or device runtime not installed on runner image."
+            exit 1
           fi
 
   # ============================================================================

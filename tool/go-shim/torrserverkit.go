@@ -1,9 +1,5 @@
 package torrserverkit
 
-/*
-#include <stdlib.h>
-*/
-import "C"
 import (
 	"fmt"
 	"net"
@@ -24,46 +20,42 @@ var (
 	running   int32
 )
 
-//export StartServer
-func StartServer(port C.int, dataDir *C.char) *C.char {
+// StartServer starts the embedded TorrServer HTTP engine and BitTorrent client.
+// Returns an empty string on success, or an error message on failure.
+func StartServer(port int, dataDir string) string {
 	runningMu.Lock()
 	defer runningMu.Unlock()
 
 	if atomic.LoadInt32(&running) == 1 {
-		return C.CString("server is already running")
+		return "server is already running"
 	}
 
-	portInt := int(port)
-	if portInt <= 0 {
-		portInt = 8090
+	if port <= 0 {
+		port = 8090
 	}
-	portStr := strconv.Itoa(portInt)
+	portStr := strconv.Itoa(port)
 
-	var dir string
-	if dataDir != nil {
-		dir = C.GoString(dataDir)
-	}
-	if dir == "" {
-		dir, _ = os.Getwd()
+	if dataDir == "" {
+		dataDir, _ = os.Getwd()
 	}
 
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return C.CString(fmt.Sprintf("failed to create data directory: %v", err))
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		return fmt.Sprintf("failed to create data directory: %v", err)
 	}
 
-	// Pre-check port availability before passing to TorrServer to avoid os.Exit(1)
+	// Pre-check port availability before passing to TorrServer to avoid exit
 	ln, err := net.Listen("tcp", "127.0.0.1:"+portStr)
 	if err != nil {
-		return C.CString(fmt.Sprintf("port %s is already in use: %v", portStr, err))
+		return fmt.Sprintf("port %s is already in use: %v", portStr, err)
 	}
 	_ = ln.Close()
 
-	settings.Path = dir
-	log.Init(filepath.Join(dir, "torrserver.log"), filepath.Join(dir, "web.log"))
+	settings.Path = dataDir
+	log.Init(filepath.Join(dataDir, "torrserver.log"), filepath.Join(dataDir, "web.log"))
 
 	settings.Args = &settings.ExecArgs{
 		Port:     portStr,
-		Path:     dir,
+		Path:     dataDir,
 		RDB:      false,
 		SearchWA: true,
 	}
@@ -71,21 +63,24 @@ func StartServer(port C.int, dataDir *C.char) *C.char {
 	atomic.StoreInt32(&running, 1)
 
 	go func() {
+		defer func() {
+			atomic.StoreInt32(&running, 0)
+		}()
 		server.Start()
 		server.WaitServer()
-		atomic.StoreInt32(&running, 0)
 	}()
 
-	return nil
+	return ""
 }
 
-//export StopServer
-func StopServer() *C.char {
+// StopServer stops the running TorrServer instance.
+// Returns an empty string on success, or an error message on failure.
+func StopServer() string {
 	runningMu.Lock()
 	defer runningMu.Unlock()
 
 	if atomic.LoadInt32(&running) == 0 {
-		return nil
+		return ""
 	}
 
 	done := make(chan struct{})
@@ -97,14 +92,14 @@ func StopServer() *C.char {
 	select {
 	case <-done:
 		atomic.StoreInt32(&running, 0)
-		return nil
+		return ""
 	case <-time.After(5 * time.Second):
 		atomic.StoreInt32(&running, 0)
-		return C.CString("server shutdown timed out")
+		return "server shutdown timed out"
 	}
 }
 
-//export IsRunning
-func IsRunning() C.int {
-	return C.int(atomic.LoadInt32(&running))
+// IsRunning returns true if TorrServer is actively running.
+func IsRunning() bool {
+	return atomic.LoadInt32(&running) == 1
 }

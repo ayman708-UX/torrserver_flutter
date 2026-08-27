@@ -1,25 +1,23 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'exceptions.dart';
-import 'ios_ffi_bindings.dart';
 import 'models/torrent_info.dart';
 import 'models/torrserver_settings.dart';
 import 'port_finder.dart';
 import 'rest_client.dart';
 import 'torrserver_controller.dart';
 
-/// In-process FFI implementation of [TorrServerController] for iOS.
+/// In-process MethodChannel implementation of [TorrServerController] for iOS.
 class TorrServerControllerIos implements TorrServerController {
-  TorrServerIosBindings? _bindings;
+  static const MethodChannel _channel = MethodChannel('torrserver_flutter');
   int? _port;
   Uri? _baseUrl;
   TorrServerRestClient? _restClient;
   bool _isRunning = false;
 
-  TorrServerControllerIos({TorrServerIosBindings? bindings})
-      : _bindings = bindings;
+  TorrServerControllerIos();
 
   @override
   bool get isRunning => _isRunning;
@@ -29,11 +27,6 @@ class TorrServerControllerIos implements TorrServerController {
 
   @override
   int? get port => _port;
-
-  TorrServerIosBindings get _effectiveBindings {
-    _bindings ??= TorrServerIosBindings();
-    return _bindings!;
-  }
 
   @override
   Future<void> start({
@@ -45,7 +38,8 @@ class TorrServerControllerIos implements TorrServerController {
   }) async {
     if (_isRunning) {
       throw const TorrServerStartException(
-          'TorrServer is already running on iOS');
+        'TorrServer is already running on iOS',
+      );
     }
 
     // 1. Select free port
@@ -57,14 +51,22 @@ class TorrServerControllerIos implements TorrServerController {
       await resolvedDataDir.create(recursive: true);
     }
 
-    // 3. Invoke native FFI StartServer
-    final error = _effectiveBindings.startServer(
-      selectedPort,
-      resolvedDataDir.path,
-    );
-
-    if (error != null && error.isNotEmpty) {
-      throw TorrServerStartException('FFI StartServer failed on iOS: $error');
+    // 3. Invoke native iOS Swift plugin over MethodChannel
+    try {
+      await _channel.invokeMethod('startServer', {
+        'port': selectedPort,
+        'dataDir': resolvedDataDir.path,
+      });
+    } on PlatformException catch (e) {
+      throw TorrServerStartException(
+        'Failed to start TorrServer on iOS: ${e.message}',
+        e,
+      );
+    } catch (e) {
+      throw TorrServerStartException(
+        'Failed to start TorrServer on iOS: $e',
+        e,
+      );
     }
 
     _port = selectedPort;
@@ -73,7 +75,7 @@ class TorrServerControllerIos implements TorrServerController {
 
     // 4. Poll healthcheck (/echo)
     try {
-      await _waitForServerReady(const Duration(seconds: 10));
+      await _waitForServerReady(const Duration(seconds: 12));
       _isRunning = true;
 
       // 5. Apply initial settings if provided
@@ -84,9 +86,13 @@ class TorrServerControllerIos implements TorrServerController {
       }
     } catch (e) {
       await stop();
-      if (e is TorrServerException) rethrow;
+      if (e is TorrServerException) {
+        rethrow;
+      }
       throw TorrServerStartException(
-          'TorrServer iOS in-process failed healthcheck: $e', e);
+        'TorrServer iOS in-process failed healthcheck: $e',
+        e,
+      );
     }
   }
 
@@ -98,7 +104,7 @@ class TorrServerControllerIos implements TorrServerController {
     _restClient = null;
 
     try {
-      _bindings?.stopServer();
+      await _channel.invokeMethod('stopServer');
     } catch (_) {}
 
     _port = null;
@@ -213,7 +219,8 @@ class TorrServerControllerIos implements TorrServerController {
 
   void _ensureRunning() {
     if (!_isRunning || _restClient == null) {
-      throw const TorrServerFfiException('TorrServer is not running on iOS');
+      throw const TorrServerProcessException(
+          'TorrServer is not running on iOS');
     }
   }
 

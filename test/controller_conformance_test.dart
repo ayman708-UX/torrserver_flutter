@@ -38,11 +38,11 @@ void main() {
       expect(controller.baseUrl, isNull);
 
       expect(() => controller.listTorrents(),
-          throwsA(isA<TorrServerFfiException>()));
+          throwsA(isA<TorrServerProcessException>()));
       expect(() => controller.getSettings(),
-          throwsA(isA<TorrServerFfiException>()));
+          throwsA(isA<TorrServerProcessException>()));
       expect(() => controller.streamUrl('hash'),
-          throwsA(isA<TorrServerFfiException>()));
+          throwsA(isA<TorrServerProcessException>()));
     });
   });
 }
