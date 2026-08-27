@@ -105,14 +105,54 @@ print('Server stopped successfully');
 
 ---
 
-## Android Configuration
+## Platform Configuration & Permissions
 
-Ensure your `android/app/src/main/AndroidManifest.xml` includes network and foreground service permissions if you enable background playback:
+### Android Configuration
+Add the following to your host app's `android/app/src/main/AndroidManifest.xml`:
 
 ```xml
-<uses-permission android:name="android.permission.INTERNET" />
-<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+<manifest ...>
+    <!-- Internet & Network permissions -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application
+        ...
+        android:extractNativeLibs="true">
+    </application>
+</manifest>
+```
+
+### iOS Configuration
+Add local networking and App Transport Security (ATS) keys to `ios/Runner/Info.plist`:
+
+```xml
+<key>NSAppTransportSecurity</key>
+<dict>
+    <key>NSAllowsArbitraryLoads</key>
+    <true/>
+    <key>NSAllowsLocalNetworking</key>
+    <true/>
+</dict>
+<key>NSLocalNetworkUsageDescription</key>
+<string>TorrServer discovers local peers and streams media over local HTTP.</string>
+```
+
+### macOS Configuration
+If your macOS app uses App Sandbox, add network client and server entitlements in `macos/Runner/DebugProfile.entitlements` and `macos/Runner/Release.entitlements`:
+
+```xml
+<dict>
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <key>com.apple.security.network.server</key>
+    <true/>
+</dict>
 ```
 
 ---
