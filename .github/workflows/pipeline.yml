@@ -189,7 +189,9 @@ jobs:
           TORRSERVER_FLUTTER_LOCAL_BINARIES: ${{ github.workspace }}/dist
         run: |
           echo "Running Linux desktop integration test with bundled TorrServer binary..."
-          xvfb-run flutter test integration_test/torrserver_integration_test.dart -d linux
+          cd example
+          flutter pub get
+          xvfb-run flutter test integration_test/torrserver_test.dart -d linux
           echo "=== Linux Desktop TorrServer Live Integration Test Passed! ==="
 
       - name: Package Desktop Binary Archive
