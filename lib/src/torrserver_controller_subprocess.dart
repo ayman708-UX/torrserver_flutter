@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/widgets.dart';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'binary_locator.dart';
 import 'exceptions.dart';
@@ -24,6 +25,7 @@ class TorrServerControllerSubprocess implements TorrServerController {
   AppLifecycleListener? _lifecycleListener;
   StreamSubscription<ProcessSignal>? _sigintSub;
   StreamSubscription<ProcessSignal>? _sigtermSub;
+  Directory? _currentDataDir;
 
   @override
   bool get isRunning => _isRunning;
@@ -54,15 +56,16 @@ class TorrServerControllerSubprocess implements TorrServerController {
       customBinaryPath: customBinaryPath,
     );
 
-    // 2. Select free port & clean up potential orphaned instance
-    var selectedPort = port ?? await PortFinder.findFreePort();
-    await _cleanupOrphanOnPort(selectedPort);
-
-    // 3. Resolve database/config directory
+    // 2. Resolve database/config directory
     final resolvedDataDir = dataDir ?? await _getDefaultDataDir();
     if (!await resolvedDataDir.exists()) {
       await resolvedDataDir.create(recursive: true);
     }
+    _currentDataDir = resolvedDataDir;
+
+    // 3. Select free port & clean up potential orphaned instance / release BoltDB lock
+    var selectedPort = port ?? await PortFinder.findFreePort();
+    await _cleanupOrphans(resolvedDataDir, selectedPort);
 
     // 4. Construct CLI arguments
     final args = <String>[
@@ -89,6 +92,12 @@ class TorrServerControllerSubprocess implements TorrServerController {
       _port = selectedPort;
       _baseUrl = Uri.parse('http://127.0.0.1:$selectedPort');
       _restClient = TorrServerRestClient(_baseUrl!);
+
+      // Record PID for orphan tracking
+      try {
+        final pidFile = _getPidFile(resolvedDataDir);
+        await pidFile.writeAsString(process.pid.toString());
+      } catch (_) {}
 
       // Listen to stdout and stderr
       process.stdout.transform(utf8.decoder).listen((data) {
@@ -133,36 +142,54 @@ class TorrServerControllerSubprocess implements TorrServerController {
   Future<void> stop() async {
     _disposeLifecycleHooks();
     final process = _process;
+    final restClient = _restClient;
+    final dataDir = _currentDataDir;
+
     _isRunning = false;
     _baseUrl = null;
-    _restClient?.close();
+    _process = null;
+    _port = null;
     _restClient = null;
 
-    if (process == null) return;
-
-    try {
-      // Send graceful termination signal
-      if (Platform.isWindows) {
-        process.kill(ProcessSignal.sigkill);
-      } else {
-        process.kill(ProcessSignal.sigint);
-      }
-
-      // Await exit with 5s timeout, force-kill if needed
-      await process.exitCode.timeout(
-        const Duration(seconds: 5),
-        onTimeout: () {
-          process.kill(ProcessSignal.sigkill);
-          return -1;
-        },
-      );
-    } catch (_) {
+    // 1. Try graceful HTTP shutdown endpoint
+    if (restClient != null) {
       try {
-        process.kill(ProcessSignal.sigkill);
+        await restClient.shutdown(timeout: const Duration(seconds: 1));
       } catch (_) {}
-    } finally {
-      _process = null;
-      _port = null;
+      restClient.close();
+    }
+
+    // 2. Terminate subprocess if still active
+    if (process != null) {
+      try {
+        if (Platform.isWindows) {
+          process.kill(ProcessSignal.sigkill);
+        } else {
+          process.kill(ProcessSignal.sigterm);
+        }
+
+        await process.exitCode.timeout(
+          const Duration(seconds: 3),
+          onTimeout: () {
+            process.kill(ProcessSignal.sigkill);
+            return -1;
+          },
+        );
+      } catch (_) {
+        try {
+          process.kill(ProcessSignal.sigkill);
+        } catch (_) {}
+      }
+    }
+
+    // 3. Clean up PID file
+    if (dataDir != null) {
+      try {
+        final pidFile = _getPidFile(dataDir);
+        if (await pidFile.exists()) {
+          await pidFile.delete();
+        }
+      } catch (_) {}
     }
   }
 
@@ -175,6 +202,9 @@ class TorrServerControllerSubprocess implements TorrServerController {
         onExitRequested: () async {
           await stop();
           return AppExitResponse.exit;
+        },
+        onHide: () {
+          // On mobile / desktop minimize, keep running
         },
       );
     } catch (_) {}
@@ -208,21 +238,47 @@ class TorrServerControllerSubprocess implements TorrServerController {
     _sigtermSub = null;
   }
 
-  Future<void> _cleanupOrphanOnPort(int targetPort) async {
+  File _getPidFile(Directory dataDir) =>
+      File(p.join(dataDir.path, 'torrserver.pid'));
+
+  Future<void> _cleanupOrphans(Directory dataDir, int targetPort) async {
+    // 1. Check PID file and terminate previous orphaned process
     try {
-      final probeClient = TorrServerRestClient(
-        Uri.parse('http://127.0.0.1:$targetPort'),
-      );
-      final echo = await probeClient.echo(
-        timeout: const Duration(milliseconds: 300),
-      );
-      if (echo.isNotEmpty) {
-        _logProcessOutput(
-          'Detected existing TorrServer ($echo) on port $targetPort',
-        );
+      final pidFile = _getPidFile(dataDir);
+      if (await pidFile.exists()) {
+        final pidStr = (await pidFile.readAsString()).trim();
+        final pid = int.tryParse(pidStr);
+        if (pid != null && pid > 0) {
+          try {
+            Process.killPid(pid, ProcessSignal.sigterm);
+            await Future<void>.delayed(const Duration(milliseconds: 150));
+            Process.killPid(pid, ProcessSignal.sigkill);
+          } catch (_) {}
+        }
+        await pidFile.delete().catchError((_) => pidFile);
       }
-    } catch (_) {
-      // Port is clear
+    } catch (_) {}
+
+    // 2. Probe target port and common default port (8090) for lingering TorrServer instances
+    final portsToCheck = {targetPort, 8090};
+    for (final port in portsToCheck) {
+      try {
+        final probeClient = TorrServerRestClient(
+          Uri.parse('http://127.0.0.1:$port'),
+        );
+        final echo = await probeClient.echo(
+          timeout: const Duration(milliseconds: 300),
+        );
+        if (echo.isNotEmpty) {
+          _logProcessOutput(
+            'Shutting down lingering TorrServer on port $port ($echo)...',
+          );
+          await probeClient.shutdown(timeout: const Duration(seconds: 1));
+          await Future<void>.delayed(const Duration(milliseconds: 250));
+        }
+      } catch (_) {
+        // Port is clear
+      }
     }
   }
 
@@ -343,8 +399,16 @@ class TorrServerControllerSubprocess implements TorrServerController {
     final deadline = DateTime.now().add(timeout);
     while (DateTime.now().isBefore(deadline)) {
       if (_process == null) {
+        final logsStr = _processLogs.join('\n');
+        if (logsStr.contains('Error open bboltDB') ||
+            logsStr.contains('timeout')) {
+          throw TorrServerStartException(
+            'TorrServer process exited during startup due to database lock contention (bboltDB timeout on config.db). '
+            'Logs: $logsStr',
+          );
+        }
         throw TorrServerStartException(
-          'TorrServer process exited prematurely during startup. Logs: ${_processLogs.join("\n")}',
+          'TorrServer process exited prematurely during startup. Logs: $logsStr',
         );
       }
       try {

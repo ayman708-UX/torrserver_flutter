@@ -1,5 +1,5 @@
 group 'com.torrserver.torrserver_flutter'
-version '0.0.5'
+version '0.0.6'
 
 buildscript {
     ext.kotlin_version = '1.9.0'
@@ -64,7 +64,7 @@ import java.security.MessageDigest
 // Custom Gradle task to download TorrServer Android NDK binaries per ABI
 task downloadTorrServerBinaries {
     doLast {
-        def version = "0.0.5"
+        def version = "0.0.6"
         def localBin = System.getenv("TORRSERVER_FLUTTER_LOCAL_BINARIES")
         def jniDir = file("src/main/jniLibs")
         def versionMarker = file("${jniDir}/.version")

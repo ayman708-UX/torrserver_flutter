@@ -23,6 +23,25 @@ void main() {
       expect(version, 'MatriX.143');
     });
 
+    test('shutdown sends GET to /shutdown', () async {
+      var shutdownCalled = false;
+      final mockClient = MockClient((request) async {
+        if (request.url.path == '/shutdown') {
+          shutdownCalled = true;
+          return http.Response('OK', 200);
+        }
+        return http.Response('Not Found', 404);
+      });
+
+      final client = TorrServerRestClient(
+        Uri.parse('http://127.0.0.1:8090'),
+        client: mockClient,
+      );
+
+      await client.shutdown();
+      expect(shutdownCalled, isTrue);
+    });
+
     test('addTorrent sends action: add and parses returned status', () async {
       final mockClient = MockClient((request) async {
         if (request.url.path == '/torrents' && request.method == 'POST') {

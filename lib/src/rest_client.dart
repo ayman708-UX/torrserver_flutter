@@ -41,6 +41,14 @@ class TorrServerRestClient {
     }
   }
 
+  /// Sends a shutdown request to `/shutdown` to trigger graceful server termination.
+  Future<void> shutdown({Duration timeout = const Duration(seconds: 2)}) async {
+    try {
+      final uri = baseUrl.replace(path: '/shutdown');
+      await _client.get(uri).timeout(timeout);
+    } catch (_) {}
+  }
+
   /// Adds a torrent via magnet link or hash.
   Future<TorrentInfo> addTorrent({
     required String link,

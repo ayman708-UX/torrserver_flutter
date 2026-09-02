@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.6
+
+- Fix Linux desktop and AppImage out-of-the-box startup by searching bundle `lib/` and `$APPDIR` mount directories in `BinaryLocator`.
+- Add automatic execution permission fallback (`chmod 755` via writable app support cache) for read-only AppImage squashfs filesystems.
+- Add PID tracking (`torrserver.pid`) and graceful shutdown (`GET /shutdown`) of lingering instances to prevent BoltDB (`config.db`) file lock timeouts.
+- Add Live Linux Desktop Integration Test to GitHub CI pipeline (`xvfb-run`).
+
 ## 0.0.5
 
 - Fixed iOS in-process engine: replaced fragile FFI dynamic lookup with Swift `MethodChannel` plugin bridge.

@@ -9,15 +9,16 @@ class BinaryLocator {
   /// Locates the appropriate TorrServer executable for the current platform and architecture.
   ///
   /// Checks the `TORRSERVER_FLUTTER_LOCAL_BINARIES` environment variable first,
-  /// followed by application bundle paths, app support directories, and working directory.
+  /// followed by application bundle paths, app support directories, AppImage mount directories,
+  /// and working directory.
   ///
-  /// Ensures execution permissions (`chmod 755`) on Unix-based systems.
+  /// Ensures execution permissions (`chmod 755`) on Unix-based systems, copying to a writable
+  /// cache directory if running from a read-only filesystem (e.g. AppImage / squashfs).
   static Future<String> locateBinary({String? customBinaryPath}) async {
     if (customBinaryPath != null && customBinaryPath.isNotEmpty) {
       final file = File(customBinaryPath);
       if (await file.exists()) {
-        await _ensureExecutable(file.path);
-        return file.path;
+        return await _ensureExecutable(file.path);
       }
       throw TorrServerBinaryNotFoundException(
         'Custom TorrServer binary not found at specified path: $customBinaryPath',
@@ -30,12 +31,11 @@ class BinaryLocator {
     if (overrideDir != null && overrideDir.isNotEmpty) {
       final binary = await _findInDirectory(Directory(overrideDir));
       if (binary != null) {
-        await _ensureExecutable(binary);
-        return binary;
+        return await _ensureExecutable(binary);
       }
     }
 
-    // Check executable directory and application support paths
+    // Check executable directory, AppImage environment, and application support paths
     final searchDirs = <Directory>[];
 
     // On Android, query nativeLibraryDir directly from the plugin MethodChannel
@@ -50,31 +50,43 @@ class BinaryLocator {
       } catch (_) {}
     }
 
+    // On Linux AppImage, check $APPDIR
+    final appDir = Platform.environment['APPDIR'];
+    if (appDir != null && appDir.isNotEmpty) {
+      searchDirs.add(Directory(p.join(appDir, 'lib')));
+      searchDirs.add(Directory(p.join(appDir, 'usr', 'lib')));
+      searchDirs.add(Directory(p.join(appDir, 'usr', 'bin')));
+      searchDirs.add(Directory(p.join(appDir, 'bin')));
+      searchDirs.add(Directory(appDir));
+    }
+
     try {
       final exeDir = File(Platform.resolvedExecutable).parent;
       searchDirs.add(exeDir);
-      searchDirs.add(Directory(p.join(exeDir.path, 'data', 'flutter_assets')));
+      searchDirs.add(Directory(p.join(exeDir.path, 'lib')));
+      searchDirs.add(Directory(p.join(exeDir.path, '..', 'lib')));
       searchDirs.add(Directory(p.join(exeDir.path, 'torrserver')));
       searchDirs.add(Directory(p.join(exeDir.path, 'bin')));
+      searchDirs.add(Directory(p.join(exeDir.path, 'data', 'flutter_assets')));
     } catch (_) {}
 
     try {
       final appSupport = await getApplicationSupportDirectory();
       searchDirs.add(appSupport);
+      searchDirs.add(Directory(p.join(appSupport.path, 'torrserver_bin')));
       searchDirs.add(Directory(p.join(appSupport.path, 'torrserver')));
       searchDirs.add(Directory(p.join(appSupport.path, 'bin')));
-      searchDirs.add(Directory(p.join(appSupport.parent.path, 'lib')));
     } catch (_) {}
 
     searchDirs.add(Directory.current);
     searchDirs.add(Directory(p.join(Directory.current.path, 'bin')));
+    searchDirs.add(Directory(p.join(Directory.current.path, 'lib')));
 
     for (final dir in searchDirs) {
       if (await dir.exists()) {
         final binary = await _findInDirectory(dir);
         if (binary != null) {
-          await _ensureExecutable(binary);
-          return binary;
+          return await _ensureExecutable(binary);
         }
       }
     }
@@ -115,6 +127,8 @@ class BinaryLocator {
         'TorrServer-linux-$arch',
         'torrserver-linux-amd64',
         'TorrServer-linux-amd64',
+        'torrserver-linux-arm64',
+        'TorrServer-linux-arm64',
         'torrserver',
         'TorrServer',
       ];
@@ -150,17 +164,52 @@ class BinaryLocator {
     } else if (version.contains('armv7') || version.contains('arm7')) {
       return 'arm7';
     } else if (version.contains('ia32') ||
-        version.contains('x86') && !version.contains('x64')) {
+        (version.contains('x86') && !version.contains('x64'))) {
       return '386';
     }
     return 'amd64';
   }
 
-  static Future<void> _ensureExecutable(String path) async {
-    if (Platform.isLinux || Platform.isMacOS || Platform.isAndroid) {
-      try {
-        await Process.run('chmod', ['755', path]);
-      } catch (_) {}
+  static Future<String> _ensureExecutable(String sourcePath) async {
+    if (!Platform.isLinux && !Platform.isMacOS && !Platform.isAndroid) {
+      return sourcePath;
+    }
+
+    try {
+      final res = await Process.run('chmod', ['755', sourcePath]);
+      if (res.exitCode == 0) {
+        return sourcePath;
+      }
+    } catch (_) {}
+
+    // Check if the file already has execute permissions (e.g. read-only mount)
+    try {
+      final stat = await File(sourcePath).stat();
+      // Check if any execute bit is set (0111 octal = 73 decimal = 0x49)
+      if ((stat.mode & 0x49) != 0) {
+        return sourcePath;
+      }
+    } catch (_) {}
+
+    // Fallback for read-only squashfs (AppImage) where chmod fails & lacks +x:
+    // Copy binary to writable app support directory and make executable
+    try {
+      final appSupport = await getApplicationSupportDirectory();
+      final binDir = Directory(p.join(appSupport.path, 'torrserver_bin'));
+      if (!await binDir.exists()) {
+        await binDir.create(recursive: true);
+      }
+      final targetFile = File(p.join(binDir.path, p.basename(sourcePath)));
+      final sourceFile = File(sourcePath);
+
+      if (!await targetFile.exists() ||
+          (await targetFile.length()) != (await sourceFile.length())) {
+        await sourceFile.copy(targetFile.path);
+      }
+      await Process.run('chmod', ['755', targetFile.path]);
+      return targetFile.path;
+    } catch (_) {
+      return sourcePath;
     }
   }
 }

@@ -170,6 +170,28 @@ jobs:
             exit 1
           fi
 
+      - name: Set up Flutter for Linux Desktop Integration Test
+        if: matrix.os == 'ubuntu-latest' && matrix.smoke_test == true
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Linux Desktop build dependencies
+        if: matrix.os == 'ubuntu-latest' && matrix.smoke_test == true
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev xvfb
+
+      - name: Run Live Linux Desktop Integration Test
+        if: matrix.os == 'ubuntu-latest' && matrix.smoke_test == true
+        env:
+          TORRSERVER_FLUTTER_LOCAL_BINARIES: ${{ github.workspace }}/dist
+        run: |
+          echo "Running Linux desktop integration test with bundled TorrServer binary..."
+          xvfb-run flutter test integration_test/torrserver_integration_test.dart -d linux
+          echo "=== Linux Desktop TorrServer Live Integration Test Passed! ==="
+
       - name: Package Desktop Binary Archive
         shell: bash
         run: |
