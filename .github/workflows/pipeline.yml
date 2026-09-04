@@ -191,6 +191,55 @@ jobs:
           path: dist/${{ matrix.archive_name }}
           if-no-files-found: error
 
+      - name: Set up Flutter for macOS Example Test
+        if: matrix.goos == 'darwin' && matrix.goarch == 'arm64'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Launch Example App Test on macOS (arm64)
+        if: matrix.goos == 'darwin' && matrix.goarch == 'arm64'
+        shell: bash
+        run: |
+          echo "=========================================================="
+          echo " Starting macOS Apple Silicon (arm64) Example Launch Test "
+          echo "=========================================================="
+          export TORRSERVER_FLUTTER_LOCAL_BINARIES="${{ github.workspace }}/dist"
+          chmod +x "${{ github.workspace }}/dist/${{ matrix.bin_name }}" || true
+
+          echo "=== Verifying native binary in dist/ ==="
+          ls -la "${{ github.workspace }}/dist"
+          file "${{ github.workspace }}/dist/${{ matrix.bin_name }}" || true
+
+          echo "=== Fetching dependencies ==="
+          flutter pub get
+          cd example
+          flutter pub get
+
+          echo "=== Launching example integration test on native macOS target ==="
+          flutter test integration_test/torrserver_test.dart -d macos -v
+
+      - name: Capture macOS Diagnostic & Crash Logs
+        if: always() && matrix.goos == 'darwin' && matrix.goarch == 'arm64'
+        shell: bash
+        run: |
+          echo "=== Checking for Diagnostic / Crash Reports ==="
+          if [ -d "$HOME/Library/Logs/DiagnosticReports" ]; then
+            ls -la "$HOME/Library/Logs/DiagnosticReports" || true
+            for f in "$HOME/Library/Logs/DiagnosticReports"/*; do
+              if [ -f "$f" ]; then
+                echo "======================================================"
+                echo "Crash Report: $f"
+                echo "======================================================"
+                cat "$f" || true
+              fi
+            done
+          else
+            echo "No DiagnosticReports directory found."
+          fi
+
+
   # ============================================================================
   # 3. ANDROID NDK CROSS-COMPILATION
   # ============================================================================
