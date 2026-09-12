@@ -48,7 +48,8 @@ void main() {
 
       // 5. Verify the BT client has the torrent registered in memory/db
       final torrentList = await controller.listTorrents();
-      stderr.writeln('[TEST] BT Client Active Torrents count: ${torrentList.length}');
+      stderr.writeln(
+          '[TEST] BT Client Active Torrents count: ${torrentList.length}');
       expect(torrentList, isNotEmpty);
       expect(
         torrentList

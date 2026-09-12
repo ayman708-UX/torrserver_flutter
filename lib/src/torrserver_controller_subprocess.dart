@@ -129,10 +129,12 @@ class TorrServerControllerSubprocess implements TorrServerController {
         } catch (_) {}
       }
     } catch (e, stack) {
-      stderr.writeln('[TorrServerController ERROR] Failed to start TorrServer subprocess: $e');
+      stderr.writeln(
+          '[TorrServerController ERROR] Failed to start TorrServer subprocess: $e');
       stderr.writeln('[TorrServerController ERROR] StackTrace:\n$stack');
       if (_processLogs.isNotEmpty) {
-        stderr.writeln('[TorrServerController ERROR] Process logs:\n${_processLogs.join("\n")}');
+        stderr.writeln(
+            '[TorrServerController ERROR] Process logs:\n${_processLogs.join("\n")}');
       }
       await stop();
       if (e is TorrServerException) rethrow;

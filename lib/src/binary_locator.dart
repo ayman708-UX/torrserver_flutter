@@ -75,10 +75,13 @@ class BinaryLocator {
       // macOS App Bundle Resources & Frameworks
       if (Platform.isMacOS) {
         searchDirs.add(Directory(p.join(exeDir.path, '..', 'Resources')));
-        searchDirs.add(Directory(p.join(exeDir.path, '..', 'Resources', 'bin')));
+        searchDirs
+            .add(Directory(p.join(exeDir.path, '..', 'Resources', 'bin')));
         searchDirs.add(Directory(p.join(exeDir.path, '..', 'Frameworks')));
-        searchDirs.add(Directory(p.join(exeDir.path, '..', 'Frameworks', 'torrserver_flutter.framework', 'Resources')));
-        searchDirs.add(Directory(p.join(exeDir.path, '..', 'Frameworks', 'torrserver_flutter.framework', 'Versions', 'A', 'Resources')));
+        searchDirs.add(Directory(p.join(exeDir.path, '..', 'Frameworks',
+            'torrserver_flutter.framework', 'Resources')));
+        searchDirs.add(Directory(p.join(exeDir.path, '..', 'Frameworks',
+            'torrserver_flutter.framework', 'Versions', 'A', 'Resources')));
       }
     } catch (_) {}
 
@@ -120,7 +123,8 @@ class BinaryLocator {
     searchDirs.add(Directory(p.join(Directory.current.path, 'lib')));
     if (Platform.isMacOS) {
       searchDirs.add(Directory(p.join(Directory.current.path, 'macos', 'bin')));
-      searchDirs.add(Directory(p.join(Directory.current.path, '..', 'macos', 'bin')));
+      searchDirs
+          .add(Directory(p.join(Directory.current.path, '..', 'macos', 'bin')));
     }
 
     // Check system PATH
@@ -364,4 +368,3 @@ class BinaryLocator {
     );
   }
 }
-
