@@ -128,7 +128,12 @@ class TorrServerControllerSubprocess implements TorrServerController {
           await _restClient!.setSettings(settings);
         } catch (_) {}
       }
-    } catch (e) {
+    } catch (e, stack) {
+      stderr.writeln('[TorrServerController ERROR] Failed to start TorrServer subprocess: $e');
+      stderr.writeln('[TorrServerController ERROR] StackTrace:\n$stack');
+      if (_processLogs.isNotEmpty) {
+        stderr.writeln('[TorrServerController ERROR] Process logs:\n${_processLogs.join("\n")}');
+      }
       await stop();
       if (e is TorrServerException) rethrow;
       throw TorrServerStartException(
@@ -433,6 +438,7 @@ class TorrServerControllerSubprocess implements TorrServerController {
         if (_processLogs.length > 200) {
           _processLogs.removeAt(0);
         }
+        stderr.writeln('[TorrServer Native] $trimmed');
       }
     }
   }
