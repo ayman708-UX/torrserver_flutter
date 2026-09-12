@@ -25,7 +25,7 @@ target_include_directories(${PLUGIN_NAME} INTERFACE
 target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)
 
 # --- TorrServer Native Binary Setup ---
-set(TORRSERVER_VERSION "0.0.6")
+set(TORRSERVER_VERSION "0.0.7")
 set(TORRSERVER_ZIP_NAME "torrserver-windows-amd64.zip")
 set(TORRSERVER_BIN_NAME "torrserver-windows-amd64.exe")
 set(TORRSERVER_DEST_NAME "torrserver.exe")

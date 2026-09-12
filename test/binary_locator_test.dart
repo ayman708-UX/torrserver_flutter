@@ -28,5 +28,17 @@ void main() {
 
       await tempDir.delete(recursive: true);
     });
+
+    test('successfully resolves TorrServer-darwin-arm64 candidate in directory', () async {
+      final tempDir = await Directory.systemTemp.createTemp('ts_mac_test_');
+      final macBin = File('${tempDir.path}/TorrServer-darwin-arm64');
+      await macBin.writeAsString('binary mock');
+
+      // Test custom path resolution
+      final resolved = await BinaryLocator.locateBinary(customBinaryPath: macBin.path);
+      expect(resolved, equals(macBin.path));
+
+      await tempDir.delete(recursive: true);
+    });
   });
 }

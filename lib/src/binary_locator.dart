@@ -14,7 +14,10 @@ class BinaryLocator {
   ///
   /// Ensures execution permissions (`chmod 755`) on Unix-based systems, copying to a writable
   /// cache directory if running from a read-only filesystem (e.g. AppImage / squashfs).
-  static Future<String> locateBinary({String? customBinaryPath}) async {
+  static Future<String> locateBinary({
+    String? customBinaryPath,
+    bool autoDownload = true,
+  }) async {
     if (customBinaryPath != null && customBinaryPath.isNotEmpty) {
       final file = File(customBinaryPath);
       if (await file.exists()) {
@@ -68,6 +71,15 @@ class BinaryLocator {
       searchDirs.add(Directory(p.join(exeDir.path, 'torrserver')));
       searchDirs.add(Directory(p.join(exeDir.path, 'bin')));
       searchDirs.add(Directory(p.join(exeDir.path, 'data', 'flutter_assets')));
+
+      // macOS App Bundle Resources & Frameworks
+      if (Platform.isMacOS) {
+        searchDirs.add(Directory(p.join(exeDir.path, '..', 'Resources')));
+        searchDirs.add(Directory(p.join(exeDir.path, '..', 'Resources', 'bin')));
+        searchDirs.add(Directory(p.join(exeDir.path, '..', 'Frameworks')));
+        searchDirs.add(Directory(p.join(exeDir.path, '..', 'Frameworks', 'torrserver_flutter.framework', 'Resources')));
+        searchDirs.add(Directory(p.join(exeDir.path, '..', 'Frameworks', 'torrserver_flutter.framework', 'Versions', 'A', 'Resources')));
+      }
     } catch (_) {}
 
     try {
@@ -78,9 +90,50 @@ class BinaryLocator {
       searchDirs.add(Directory(p.join(appSupport.path, 'bin')));
     } catch (_) {}
 
+    // System-wide, homebrew, and official TorrServer installer directories
+    if (Platform.isMacOS) {
+      searchDirs.add(Directory('/Users/Shared/TorrServer'));
+      searchDirs.add(Directory('/usr/local/bin'));
+      searchDirs.add(Directory('/opt/homebrew/bin'));
+      searchDirs.add(Directory('/opt/local/bin'));
+
+      final home = Platform.environment['HOME'];
+      if (home != null && home.isNotEmpty) {
+        searchDirs.add(Directory(p.join(home, 'bin')));
+        searchDirs.add(Directory(p.join(home, '.local', 'bin')));
+        searchDirs.add(Directory(p.join(home, 'Applications', 'TorrServer')));
+        searchDirs.add(Directory(p.join(home, 'Downloads', 'TorrServer')));
+      }
+    } else if (Platform.isLinux) {
+      searchDirs.add(Directory('/usr/local/bin'));
+      searchDirs.add(Directory('/usr/bin'));
+      searchDirs.add(Directory('/opt/torrserver'));
+      final home = Platform.environment['HOME'];
+      if (home != null && home.isNotEmpty) {
+        searchDirs.add(Directory(p.join(home, 'bin')));
+        searchDirs.add(Directory(p.join(home, '.local', 'bin')));
+      }
+    }
+
     searchDirs.add(Directory.current);
     searchDirs.add(Directory(p.join(Directory.current.path, 'bin')));
     searchDirs.add(Directory(p.join(Directory.current.path, 'lib')));
+    if (Platform.isMacOS) {
+      searchDirs.add(Directory(p.join(Directory.current.path, 'macos', 'bin')));
+      searchDirs.add(Directory(p.join(Directory.current.path, '..', 'macos', 'bin')));
+    }
+
+    // Check system PATH
+    final pathEnv = Platform.environment['PATH'];
+    if (pathEnv != null && pathEnv.isNotEmpty) {
+      final separator = Platform.isWindows ? ';' : ':';
+      for (final segment in pathEnv.split(separator)) {
+        final trimmed = segment.trim();
+        if (trimmed.isNotEmpty) {
+          searchDirs.add(Directory(trimmed));
+        }
+      }
+    }
 
     for (final dir in searchDirs) {
       if (await dir.exists()) {
@@ -88,6 +141,22 @@ class BinaryLocator {
         if (binary != null) {
           return await _ensureExecutable(binary);
         }
+      }
+    }
+
+    // Auto-download fallback if binary is not found locally
+    if (autoDownload) {
+      try {
+        return await _downloadBinary();
+      } catch (e) {
+        if (e is TorrServerBinaryNotFoundException) rethrow;
+        final platformName = Platform.operatingSystem;
+        final arch = _getArchitecture();
+        throw TorrServerBinaryNotFoundException(
+          'Could not locate TorrServer executable for platform "$platformName" (arch: "$arch"), '
+          'and auto-download failed ($e). Ensure internet access or specify TORRSERVER_FLUTTER_LOCAL_BINARIES.',
+          null,
+        );
       }
     }
 
@@ -212,4 +281,87 @@ class BinaryLocator {
       return sourcePath;
     }
   }
+
+  /// Downloads the native TorrServer binary on-demand from official releases when not found locally.
+  static Future<String> _downloadBinary() async {
+    final platformName = Platform.operatingSystem;
+    final arch = _getArchitecture();
+
+    String? downloadName;
+    if (Platform.isMacOS) {
+      downloadName = 'TorrServer-darwin-$arch';
+    } else if (Platform.isLinux) {
+      downloadName = 'TorrServer-linux-$arch';
+    } else if (Platform.isWindows) {
+      downloadName = 'TorrServer-windows-$arch.exe';
+    } else if (Platform.isAndroid) {
+      downloadName = 'TorrServer-android-$arch';
+    }
+
+    if (downloadName == null) {
+      throw TorrServerBinaryNotFoundException(
+        'Automatic binary download is not supported for platform "$platformName" (arch: "$arch").',
+      );
+    }
+
+    final appSupport = await getApplicationSupportDirectory();
+    final binDir = Directory(p.join(appSupport.path, 'torrserver_bin'));
+    if (!await binDir.exists()) {
+      await binDir.create(recursive: true);
+    }
+
+    final targetPath = p.join(
+      binDir.path,
+      Platform.isWindows ? 'torrserver.exe' : 'torrserver',
+    );
+    final targetFile = File(targetPath);
+    final tempFile = File('$targetPath.download');
+
+    final urls = [
+      'https://github.com/YouROK/TorrServer/releases/latest/download/$downloadName',
+      'https://raw.githubusercontent.com/YouROK/TorrServer/master/releases/$downloadName',
+    ];
+
+    Object? lastError;
+    final client = HttpClient();
+    client.connectionTimeout = const Duration(seconds: 15);
+
+    for (final url in urls) {
+      try {
+        final uri = Uri.parse(url);
+        final request = await client.getUrl(uri);
+        request.followRedirects = true;
+        request.maxRedirects = 5;
+        final response = await request.close();
+
+        if (response.statusCode == 200) {
+          final sink = tempFile.openWrite();
+          await response.pipe(sink);
+          if (await tempFile.exists() && (await tempFile.length()) > 500000) {
+            if (await targetFile.exists()) {
+              await targetFile.delete();
+            }
+            await tempFile.rename(targetFile.path);
+            client.close();
+            return await _ensureExecutable(targetFile.path);
+          }
+        }
+      } catch (e) {
+        lastError = e;
+        try {
+          if (await tempFile.exists()) {
+            await tempFile.delete();
+          }
+        } catch (_) {}
+      }
+    }
+    client.close();
+
+    throw TorrServerBinaryNotFoundException(
+      'Could not locate TorrServer executable for platform "$platformName" (arch: "$arch"), '
+      'and automatic download failed (${lastError ?? "download server unreachable"}). '
+      'Please install TorrServer to /Users/Shared/TorrServer or specify TORRSERVER_FLUTTER_LOCAL_BINARIES.',
+    );
+  }
 }
+

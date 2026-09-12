@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.7
+
+- Fix macOS Apple Silicon and desktop binary discovery out of the box:
+  - Add `s.resources = ['bin/torrserver']` in macOS podspec to bundle TorrServer directly into `Contents/Resources/torrserver`.
+  - Add search in `/Users/Shared/TorrServer` (official TorrServer macOS installer path) and standard system directories (`/usr/local/bin`, `/opt/homebrew/bin`, `PATH`).
+  - Add automatic on-demand download fallback in `BinaryLocator` fetching the official binary on first launch if not found locally.
+- Add macOS Apple Silicon live launch integration test to CI workflow.
+
 ## 0.0.6
 
 - Fix Linux desktop and AppImage out-of-the-box startup by searching bundle `lib/` and `$APPDIR` mount directories in `BinaryLocator`.

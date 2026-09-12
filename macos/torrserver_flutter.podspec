@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'torrserver_flutter'
-  s.version          = '0.0.6'
+  s.version          = '0.0.7'
   s.summary          = 'TorrServer Flutter macOS plugin'
   s.description      = <<-DESC
 Flutter package wrapping TorrServer for macOS desktop via subprocess model.
@@ -17,10 +17,12 @@ Flutter package wrapping TorrServer for macOS desktop via subprocess model.
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
   s.swift_version = '5.0'
 
+  s.resources = ['bin/torrserver']
+
   # Download macOS TorrServer binary hook
   s.prepare_command = <<-CMD
     set -e
-    VERSION="0.0.6"
+    VERSION="0.0.7"
     LOCAL_BIN="${TORRSERVER_FLUTTER_LOCAL_BINARIES}"
     mkdir -p bin
 
@@ -49,7 +51,7 @@ Flutter package wrapping TorrServer for macOS desktop via subprocess model.
       echo "Downloading TorrServer macOS compressed archive ($ARCHIVE_NAME) from GitHub Releases..."
       curl -sL "https://github.com/ayman708-UX/torrserver_flutter/releases/download/v${VERSION}/checksums.txt" -o "bin/checksums.txt" || true
       curl -sL "https://github.com/ayman708-UX/torrserver_flutter/releases/download/v${VERSION}/${ARCHIVE_NAME}" -o "bin/${ARCHIVE_NAME}" || true
-      if [ -f "bin/${ARCHIVE_NAME}" ]; then
+      if [ -f "bin/${ARCHIVE_NAME}" ] && [ -s "bin/${ARCHIVE_NAME}" ]; then
         if [ -f "bin/checksums.txt" ]; then
           EXPECTED_HASH=$(grep "$ARCHIVE_NAME" bin/checksums.txt | awk '{print $1}')
           if [ -n "$EXPECTED_HASH" ]; then
@@ -70,6 +72,18 @@ Flutter package wrapping TorrServer for macOS desktop via subprocess model.
         fi
         rm -f "bin/${ARCHIVE_NAME}"
         chmod 755 bin/torrserver || true
+      fi
+
+      # Fallback to upstream YouROK standalone binary release if not extracted
+      if [ ! -f "bin/torrserver" ] || [ ! -s "bin/torrserver" ]; then
+        echo "Fallback: downloading official TorrServer binary (TorrServer-darwin-${ARCH_NAME}) from upstream YouROK release..."
+        curl -sL "https://github.com/YouROK/TorrServer/releases/latest/download/TorrServer-darwin-${ARCH_NAME}" -o "bin/torrserver" || true
+        chmod 755 bin/torrserver || true
+      fi
+
+      # Guarantee placeholder exists so CocoaPods s.resources does not fail if offline
+      if [ ! -f "bin/torrserver" ]; then
+        touch bin/torrserver
       fi
     fi
   CMD
